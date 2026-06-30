@@ -304,7 +304,7 @@ async def unban_cmd(update: Update, context):
     cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
     db.commit()
     
-        await update.message.reply_text(f"✅ کاربر {target} از بن خارج شد")
+    await update.message.reply_text(f"✅ کاربر {target} از بن خارج شد")
 
         # FIX 1: REPORT ALWAYS WORKS
         if text == "📊 گزارش پنل":
