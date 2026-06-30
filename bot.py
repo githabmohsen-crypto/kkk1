@@ -287,22 +287,22 @@ async def handle(update: Update, context):
                 await q.answer("رفع بن شد")
                 await q.edit_message_text("✅ کاربر از بن خارج شد")
                 return
-     async def unban_cmd(update: Update, context):
+async def unban_cmd(update: Update, context):
 
-        uid = update.effective_user.id
+    uid = update.effective_user.id
     
-        if uid not in ADMIN_IDS:
-            await update.message.reply_text("⛔ دسترسی ندارید")
-            return
+    if uid not in ADMIN_IDS:
+        await update.message.reply_text("⛔ دسترسی ندارید")
+        return
     
-        if len(context.args) == 0:
-            await update.message.reply_text("❌ مثال: /unban 123456")
-            return
+    if len(context.args) == 0:
+        await update.message.reply_text("❌ مثال: /unban 123456")
+        return
     
-        target = int(context.args[0])
+    target = int(context.args[0])
     
-        cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
-        db.commit()
+    cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
+    db.commit()
     
         await update.message.reply_text(f"✅ کاربر {target} از بن خارج شد")
 
