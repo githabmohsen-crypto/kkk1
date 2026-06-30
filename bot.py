@@ -463,7 +463,7 @@ async def handle(update: Update, context):
         return
 # ---------------- RUN ----------------
 app = Application.builder().token(TOKEN).build()
-app.add_handler(CommandHandler("unban", unban_cmd))
+
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(callback))
 app.add_handler(MessageHandler(filters.ALL, handle))
