@@ -480,7 +480,7 @@ async def unban_cmd(update: Update, context):
         ticket_mode[uid] = False
         return
 # ---------------- RUN ----------------
-app.add_handler(CommandHandler("unban", unban_cmd))
+
 app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
