@@ -39,8 +39,9 @@ created INTEGER
 """)
 db.commit()
 
-ticket_mode = {}
-reply_mode = {}
+# حرفه‌ای‌تر: مدیریت تیکت فعال ادمین‌ها
+admin_reply_ticket = {}   # admin_id -> ticket_id
+user_ticket_mode = {}     # user_id -> bool
 
 
 # ---------------- CHECK MEMBER ----------------
@@ -138,34 +139,31 @@ async def callback(update: Update, context):
     # -------- START TICKET --------
     if q.data == "start_ticket":
 
-        ticket_mode[uid] = True
+        user_ticket_mode[uid] = True
 
         await q.message.reply_text("✍ پیام خود را ارسال کنید")
 
         return
 
 
-    # -------- REPLY --------
+    # -------- ADMIN REPLY SELECT TICKET --------
     if q.data.startswith("reply_"):
 
-        target = int(q.data.split("_")[1])
+        tid = int(q.data.split("_")[1])
 
-        reply_mode[uid] = target
+        admin_reply_ticket[uid] = tid
 
         await q.message.reply_text("✉ پاسخ را بنویس")
 
         return
 
 
-    # -------- CLOSE --------
+    # -------- CLOSE TICKET --------
     if q.data.startswith("close_"):
 
         tid = int(q.data.split("_")[1])
 
-        cur.execute(
-            "UPDATE tickets SET status='closed' WHERE id=?",
-            (tid,)
-        )
+        cur.execute("UPDATE tickets SET status='closed' WHERE id=?", (tid,))
         db.commit()
 
         await q.edit_message_text("✔ بسته شد")
@@ -183,27 +181,65 @@ async def handle(update: Update, context):
     text = update.message.text
 
 
-    # -------- ADMIN REPLY --------
-    if uid in ADMIN_IDS and uid in reply_mode:
+    # ================= ADMIN REPLY (PRO FIX) =================
+    if uid in ADMIN_IDS and uid in admin_reply_ticket:
 
-        target = reply_mode[uid]
+        tid = admin_reply_ticket[uid]
 
-        await context.bot.send_message(
-            target,
-            f"📩 پاسخ پشتیبانی:\n\n{text}"
-        )
+        cur.execute("SELECT user_id FROM tickets WHERE id=?", (tid,))
+        row = cur.fetchone()
+
+        if not row:
+            await update.message.reply_text("❌ تیکت پیدا نشد")
+            return
+
+        target = row[0]
+
+        caption = "📩 پاسخ پشتیبانی"
+
+        # --- MEDIA SUPPORT ---
+        if update.message.photo:
+
+            await context.bot.send_photo(
+                chat_id=target,
+                photo=update.message.photo[-1].file_id,
+                caption=caption
+            )
+
+        elif update.message.video:
+
+            await context.bot.send_video(
+                chat_id=target,
+                video=update.message.video.file_id,
+                caption=caption
+            )
+
+        elif update.message.document:
+
+            await context.bot.send_document(
+                chat_id=target,
+                document=update.message.document.file_id,
+                caption=caption
+            )
+
+        else:
+
+            await context.bot.send_message(
+                chat_id=target,
+                text=f"{caption}\n\n{text}"
+            )
 
         await update.message.reply_text("✅ ارسال شد")
 
-        del reply_mode[uid]
+        del admin_reply_ticket[uid]
         return
 
 
-    # -------- USER --------
+    # ================= USER =================
     if uid not in ADMIN_IDS:
 
 
-        # ================= RULES (بدون تغییر متن) =================
+        # -------- RULES --------
         if text == "📜 قوانین":
 
             await update.message.reply_text(
@@ -221,13 +257,13 @@ async def handle(update: Update, context):
             return
 
 
-        # ================= CONTACT (بدون تغییر متن) =================
+        # -------- CONTACT --------
         if text == "📞 تماس با پشتیبانی":
 
             await update.message.reply_text(
                 "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه پایین استفاده کنید.\n\n"
-                "‼️ لطفاً موضوع را در قالب یک پیام منسجم و واضح بنویسید؛ این کار باعث می‌شود پاسخگویی سریع‌تر انجام شود 💙\n\n"
-                "✅ با لمس دکمه زیر، گفتگو با تیم پشتیبانی آغاز می‌شود.",
+                "‼️ لطفاً موضوع را در قالب یک پیام منسجم و واضح بنویسید 💙\n\n"
+                "✅ با لمس دکمه زیر گفتگو آغاز می‌شود.",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
                 ])
@@ -235,8 +271,8 @@ async def handle(update: Update, context):
             return
 
 
-        # ================= TICKET MODE (MEDIA FIX) =================
-        if ticket_mode.get(uid):
+        # -------- TICKET CREATE --------
+        if user_ticket_mode.get(uid):
 
             message_type = "text"
             file_id = None
@@ -270,67 +306,39 @@ async def handle(update: Update, context):
 
             tid = cur.lastrowid
 
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{tid}")],
+                [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")]
+            ])
+
+            caption_text = f"🎫 تیکت #{tid}\n👤 {uid}\n\n📝 {caption}"
+
             for admin in ADMIN_IDS:
 
-                caption_text = f"🎫 تیکت #{tid}\n👤 {uid}\n\n📝 {caption}"
-
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")]
-                ])
-
                 if message_type == "photo":
-
-                    await context.bot.send_photo(
-                        chat_id=admin,
-                        photo=file_id,
-                        caption=caption_text,
-                        reply_markup=keyboard
-                    )
+                    await context.bot.send_photo(admin, file_id, caption_text, reply_markup=keyboard)
 
                 elif message_type == "video":
-
-                    await context.bot.send_video(
-                        chat_id=admin,
-                        video=file_id,
-                        caption=caption_text,
-                        reply_markup=keyboard
-                    )
+                    await context.bot.send_video(admin, file_id, caption_text, reply_markup=keyboard)
 
                 elif message_type == "document":
-
-                    await context.bot.send_document(
-                        chat_id=admin,
-                        document=file_id,
-                        caption=caption_text,
-                        reply_markup=keyboard
-                    )
+                    await context.bot.send_document(admin, file_id, caption_text, reply_markup=keyboard)
 
                 else:
+                    await context.bot.send_message(admin, caption_text, reply_markup=keyboard)
 
-                    await context.bot.send_message(
-                        chat_id=admin,
-                        text=caption_text,
-                        reply_markup=keyboard
-                    )
+            await update.message.reply_text("✅ تیکت ثبت شد")
 
-            await update.message.reply_text(f"✅ تیکت ثبت شد")
-
-            ticket_mode[uid] = False
+            user_ticket_mode[uid] = False
             return
 
 
-    # -------- ADMIN PANEL --------
+    # ================= ADMIN PANEL =================
     if uid in ADMIN_IDS:
 
         if text == "📋 تیکت‌های باز":
 
-            cur.execute("""
-            SELECT id, user_id, message
-            FROM tickets
-            WHERE status='open'
-            """)
-
+            cur.execute("SELECT id, user_id, message FROM tickets WHERE status='open'")
             rows = cur.fetchall()
 
             if not rows:
@@ -340,7 +348,7 @@ async def handle(update: Update, context):
             for tid, user, msg in rows:
 
                 keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{user}")],
+                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{tid}")],
                     [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")]
                 ])
 
