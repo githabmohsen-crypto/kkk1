@@ -74,7 +74,7 @@ def is_banned(uid):
     cur.execute("SELECT 1 FROM banned WHERE user_id=?", (uid,))
     return cur.fetchone() is not None
 
-# ---------------- MEMBER CHECK ----------------
+# ---------------- MEMBER ----------------
 async def is_member(context, user_id):
     try:
         m = await context.bot.get_chat_member(CHANNEL, user_id)
@@ -93,11 +93,7 @@ async def enforce_channel(update, context):
     cur.execute("""
     INSERT OR IGNORE INTO profiles(user_id, username, join_time, tickets_count)
     VALUES (?, ?, ?, 0)
-    """, (
-        uid,
-        update.effective_user.username or "ندارد",
-        int(time.time())
-    ))
+    """, (uid, update.effective_user.username or "ندارد", int(time.time())))
     db.commit()
 
     if is_banned(uid):
@@ -116,7 +112,7 @@ async def enforce_channel(update, context):
 
     return True
 
-# ---------------- MENUS (TEXTS NOT CHANGED) ----------------
+# ---------------- MENUS ----------------
 def user_menu():
     return ReplyKeyboardMarkup(
         [["👤 پروفایل من"], ["📞 تماس با پشتیبانی"], ["📜 قوانین"]],
@@ -231,22 +227,33 @@ async def handle(update: Update, context):
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
 
-        if text == "🚫 مدیریت بن":
-            await update.message.reply_text("✍ /ban id | /unban id")
-            return
+        # FIX 1: REPORT ALWAYS WORKS
+        if text == "📊 گزارش پنل":
 
-        if text and text.startswith("/ban"):
-            target = int(text.split()[1])
-            cur.execute("INSERT OR IGNORE INTO banned(user_id) VALUES(?)", (target,))
-            db.commit()
-            await update.message.reply_text("🚫 بن شد")
-            return
+            cur.execute("SELECT COUNT(*) FROM users")
+            users = cur.fetchone()[0]
 
-        if text and text.startswith("/unban"):
-            target = int(text.split()[1])
-            cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
-            db.commit()
-            await update.message.reply_text("✅ آنبن شد")
+            cur.execute("SELECT COUNT(*) FROM tickets")
+            tickets = cur.fetchone()[0]
+
+            cur.execute("SELECT COUNT(*) FROM banned")
+            banned = cur.fetchone()[0]
+
+            cur.execute("SELECT AVG(rating) FROM tickets WHERE rating IS NOT NULL")
+            avg = cur.fetchone()[0] or 0
+
+            cur.execute("SELECT user_id FROM banned")
+            banned_list = cur.fetchall()
+            banned_text = "\n".join([str(x[0]) for x in banned_list]) or "ندارد"
+
+            await update.message.reply_text(
+                f"📊 گزارش سیستم\n\n"
+                f"👤 کاربران: {users}\n"
+                f"🎫 تیکت‌ها: {tickets}\n"
+                f"🚫 بن: {banned}\n"
+                f"⭐ میانگین رضایت: {round(avg,2)}\n\n"
+                f"🚫 لیست بن‌ها:\n{banned_text}"
+            )
             return
 
         if text == "📋 تیکت‌های باز":
@@ -259,6 +266,7 @@ async def handle(update: Update, context):
                 return
 
             for tid, uid2, username, message in rows:
+
                 await update.message.reply_text(
                     f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid2}\n\n📝 {message}",
                     reply_markup=InlineKeyboardMarkup([
@@ -269,12 +277,7 @@ async def handle(update: Update, context):
                 )
             return
 
-        # ---------------- BROADCAST FIX (TEXT + PHOTO) ----------------
-        if text == "📣 ارسال همگانی":
-            broadcast_mode[uid] = True
-            await update.message.reply_text("✍ متن یا عکس ارسال کنید")
-            return
-
+        # ---------------- FIX 2: MEDIA NOT NONE ----------------
         if broadcast_mode.get(uid):
 
             cur.execute("SELECT user_id FROM users")
@@ -283,7 +286,7 @@ async def handle(update: Update, context):
             for u in users:
                 try:
                     if photo:
-                        await context.bot.send_photo(u, photo[-1].file_id, caption=caption)
+                        await context.bot.send_photo(u, photo[-1].file_id, caption=caption or "")
                     else:
                         await context.bot.send_message(u, f"📢 {text or caption}")
                 except:
@@ -298,7 +301,7 @@ async def handle(update: Update, context):
             target = reply_mode[uid]
 
             if photo:
-                await context.bot.send_photo(target, photo[-1].file_id, caption=caption)
+                await context.bot.send_photo(target, photo[-1].file_id, caption=caption or "")
             else:
                 await context.bot.send_message(target, f"📩 پاسخ پشتیبانی:\n\n{text}")
 
@@ -307,8 +310,6 @@ async def handle(update: Update, context):
             return
 
     # ---------------- USER ----------------
-
-    # PROFILE FIX (RESTORED)
     if text == "👤 پروفایل من":
 
         cur.execute("SELECT username, join_time, tickets_count FROM profiles WHERE user_id=?", (uid,))
@@ -316,6 +317,7 @@ async def handle(update: Update, context):
 
         if row:
             username, join_time, tickets = row
+
             await update.message.reply_text(
                 f"👤 پروفایل شما\n\n"
                 f"🆔 ID: {uid}\n"
@@ -351,7 +353,6 @@ async def handle(update: Update, context):
         )
         return
 
-    # ---------------- TICKET FIX ----------------
     if ticket_mode.get(uid):
 
         username = update.effective_user.username or "ندارد"
