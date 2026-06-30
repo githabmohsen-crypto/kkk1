@@ -333,6 +333,7 @@ async def handle(update: Update, context):
                         [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid2}")],
                         [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
                         [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid2}")]
+                        [InlineKeyboardButton("✅ رفع بن", callback_data=f"unban_{uid2}")]
                     ])
                 )
             return
