@@ -471,7 +471,7 @@ async def handle(update: Update, context):
                     reply_markup=keyboard
                 )
     
-        await update.message.reply_text("
+        await update.message.reply_text(
             "تیکت شما به واحد پشتیبانی ارسال شد ✅️/n"
 
             "1️⃣ درخواست شما در صف بررسی تیم پشتیبانی قرار گرفت و در اولین فرصت پاسخ داده خواهد شد./n"
