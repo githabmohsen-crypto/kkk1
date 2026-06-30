@@ -244,6 +244,28 @@ async def callback(update: Update, context):
         await q.answer("کاربر بن شد")
     
         return
+    if q.data.startswith("unban_"):
+    
+        target = int(q.data.split("_")[1])
+    
+        cur.execute(
+            "DELETE FROM banned WHERE user_id=?",
+            (target,)
+        )
+    
+        db.commit()
+    
+        try:
+            await context.bot.send_message(
+                target,
+                "✅ محدودیت شما برداشته شد"
+            )
+        except:
+            pass
+    
+        await q.answer("رفع بن انجام شد")
+    
+        return
 
 # ---------------- HANDLE ----------------
 async def handle(update: Update, context):
