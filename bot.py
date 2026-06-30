@@ -337,24 +337,7 @@ async def handle(update: Update, context):
                     ])
                 )
             return
-async def unban_cmd(update: Update, context):
 
-    uid = update.effective_user.id
-        
-    if uid not in ADMIN_IDS:
-         await update.message.reply_text("⛔ دسترسی ندارید")
-         return
-        
-    if len(context.args) == 0:
-         await update.message.reply_text("❌ مثال: /unban 123456")
-         return
-        
-    target = int(context.args[0])
-        
-    cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
-    db.commit()
-        
-    await update.message.reply_text(f"✅ کاربر {target} از بن خارج شد")
 
         # ---------------- FIX 2: MEDIA NOT NONE ----------------
         if broadcast_mode.get(uid):
