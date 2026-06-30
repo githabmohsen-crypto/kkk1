@@ -285,7 +285,7 @@ async def handle(update: Update, context):
         # ---------------- FIX 2: MEDIA NOT NONE ----------------
         if broadcast_mode.get(uid):
 
-            cur.execute("SELECT user_id FROM users")
+            cur.execute("SELECT user_id FROM profiles")
             users = [r[0] for r in cur.fetchall()]
 
             for u in users:
