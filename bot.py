@@ -8,7 +8,7 @@ from telegram.ext import (
     MessageHandler,
     CallbackQueryHandler,
     ContextTypes,
-    filters
+    filters,
 )
 
 # ---------------- CONFIG ----------------
@@ -32,18 +32,18 @@ CREATE TABLE IF NOT EXISTS tickets (
 """)
 conn.commit()
 
-ticket_to_user = {}
 user_state = {}
+reply_to_user = {}
 
-# ---------------- CHECK CHANNEL ----------------
-async def is_member(context, user_id):
+# ---------------- CHECK CHANNEL MEMBERSHIP ----------------
+async def is_member(context, user_id: int) -> bool:
     try:
         member = await context.bot.get_chat_member(CHANNEL, user_id)
         return member.status in ["member", "administrator", "creator"]
     except:
         return False
 
-# ---------------- MENUS ----------------
+# ---------------- KEYBOARDS ----------------
 def user_menu():
     return ReplyKeyboardMarkup(
         [["📩 ارسال تیکت"], ["📜 قوانین", "📞 ارتباط"]],
@@ -61,14 +61,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
 
     if not await is_member(context, uid):
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📢 عضویت در کانال", url="https://t.me/Kaletek_news")],
-            [InlineKeyboardButton("✅ عضو شدم", callback_data="check")]
-        ])
-
         await update.message.reply_text(
             "🚀 برای استفاده باید عضو کانال باشی:",
-            reply_markup=keyboard
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📢 عضویت", url="https://t.me/Kaletek_news")],
+                [InlineKeyboardButton("✅ عضو شدم", callback_data="check")]
+            ])
         )
         return
 
@@ -77,13 +75,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("👋 خوش آمدی", reply_markup=user_menu())
 
-# ---------------- CALLBACK (JOIN CHECK) ----------------
+# ---------------- CALLBACK ----------------
 async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
     uid = query.from_user.id
 
+    # membership check
     if query.data == "check":
         if await is_member(context, uid):
             await query.message.reply_text("✅ تایید شد")
@@ -91,24 +90,20 @@ async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await query.message.reply_text("❌ هنوز عضو نشدی")
 
-# ---------------- DB FUNCTIONS ----------------
-def save_ticket(uid, username, msg):
-    cur.execute("""
-        INSERT INTO tickets (user_id, username, message, status, time)
-        VALUES (?, ?, ?, 'open', ?)
-    """, (uid, username, msg, int(time.time())))
-    conn.commit()
-    return cur.lastrowid
+    # admin reply setup
+    elif query.data.startswith("reply_"):
+        target = int(query.data.split("_")[1])
+        reply_to_user[uid] = target
+        await query.message.reply_text("✉ حالا پیام پاسخ را بنویس:")
 
-def get_tickets():
-    cur.execute("SELECT id, user_id, message FROM tickets WHERE status='open'")
-    return cur.fetchall()
+    # close ticket
+    elif query.data.startswith("close_"):
+        tid = int(query.data.split("_")[1])
+        cur.execute("UPDATE tickets SET status='closed' WHERE id=?", (tid,))
+        conn.commit()
+        await query.edit_message_text("✔ تیکت بسته شد")
 
-def close_ticket(tid):
-    cur.execute("UPDATE tickets SET status='closed' WHERE id=?", (tid,))
-    conn.commit()
-
-# ---------------- MAIN HANDLER ----------------
+# ---------------- MESSAGE HANDLER ----------------
 async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     uid = user.id
@@ -122,34 +117,31 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         if text == "📞 ارتباط":
-            await update.message.reply_text("📞 از تیکت استفاده کن")
+            await update.message.reply_text("📞 از سیستم تیکت استفاده کنید")
             return
 
         if text == "📩 ارسال تیکت":
             user_state[uid] = True
-            await update.message.reply_text("✍ پیام خود را بفرست")
+            await update.message.reply_text("✍ پیام خود را ارسال کنید:")
             return
 
         if user_state.get(uid):
-            tid = save_ticket(uid, user.username, text)
+            cur.execute("""
+                INSERT INTO tickets (user_id, username, message, status, time)
+                VALUES (?, ?, ?, 'open', ?)
+            """, (uid, user.username, text, int(time.time())))
+            conn.commit()
 
-            for admin in ADMIN_IDS:
-                msg = await context.bot.send_message(
-                    admin,
-                    f"🎫 Ticket #{tid}\n👤 @{user.username}\n🆔 {uid}\n\n📝 {text}"
-                )
-
-                ticket_to_user[msg.message_id] = uid
-
-            await update.message.reply_text(f"✅ ثبت شد #{tid}")
             user_state[uid] = False
+            await update.message.reply_text("✅ تیکت ثبت شد")
             return
 
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
 
         if text == "📋 تیکت‌های باز":
-            tickets = get_tickets()
+            cur.execute("SELECT id, user_id, message FROM tickets WHERE status='open'")
+            tickets = cur.fetchall()
 
             if not tickets:
                 await update.message.reply_text("📭 تیکتی نیست")
@@ -157,6 +149,7 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             for tid, user_id, msg in tickets:
                 keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{user_id}")],
                     [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")]
                 ])
 
@@ -165,46 +158,28 @@ async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=keyboard
                 )
 
-# ---------------- CALLBACK BUTTONS ----------------
-async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    data = query.data
-
-    if data.startswith("close_"):
-        tid = int(data.split("_")[1])
-        close_ticket(tid)
-        await query.edit_message_text("✔ بسته شد")
-
 # ---------------- ADMIN REPLY ----------------
 async def admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
-    text = update.message.text
 
-    if uid not in ADMIN_IDS:
-        return
+    if uid in ADMIN_IDS and uid in reply_to_user:
+        target = reply_to_user[uid]
 
-    if update.message.reply_to_message:
-        msg_id = update.message.reply_to_message.message_id
+        await context.bot.send_message(
+            chat_id=target,
+            text=f"📩 پاسخ پشتیبانی:\n\n{update.message.text}"
+        )
 
-        if msg_id in ticket_to_user:
-            target = ticket_to_user[msg_id]
+        await update.message.reply_text("✅ ارسال شد")
+        del reply_to_user[uid]
 
-            await context.bot.send_message(
-                chat_id=target,
-                text=f"📩 پاسخ پشتیبانی:\n\n{text}"
-            )
-
-            await update.message.reply_text("✅ ارسال شد")
-
-# ---------------- RUN ----------------
+# ---------------- APP ----------------
 app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(callback))
-app.add_handler(CallbackQueryHandler(buttons))
+
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
-app.add_handler(MessageHandler(filters.TEXT, admin_reply))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, admin_reply))
 
 app.run_polling()
