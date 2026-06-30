@@ -248,17 +248,6 @@ async def callback(update: Update, context):
 
 # ---------------- HANDLE ----------------
 async def handle(update: Update, context):
-    if uid in ADMIN_IDS and unban_mode.get(uid):
-
-        target = int(text)
-    
-        cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
-        db.commit()
-    
-        await update.message.reply_text(f"✅ کاربر {target} رفع بن شد")
-    
-        unban_mode[uid] = False
-        return
 
     if not await enforce_channel(update, context):
         return
@@ -388,6 +377,17 @@ async def handle(update: Update, context):
 
             await update.message.reply_text("✅ ارسال شد")
             del reply_mode[uid]
+            return
+        if uid in ADMIN_IDS and unban_mode.get(uid):
+    
+            target = int(text)
+        
+            cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
+            db.commit()
+        
+            await update.message.reply_text(f"✅ کاربر {target} رفع بن شد")
+        
+            unban_mode[uid] = False
             return
 
     # ---------------- USER ----------------
