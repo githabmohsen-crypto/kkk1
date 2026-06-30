@@ -59,7 +59,7 @@ ticket_mode = {}
 broadcast_mode = {}
 reply_state = {}
 
-# ---------------- USER SAVE ----------------
+# ---------------- SAVE USER ----------------
 def save_user(user):
     cur.execute("""
     INSERT OR IGNORE INTO users(user_id, username, first_name)
@@ -105,7 +105,7 @@ async def enforce_channel(update, context):
 # ---------------- MENUS ----------------
 def user_menu():
     return ReplyKeyboardMarkup(
-        [["📞 تماس با پشتیبانی"], ["📜 قوانین"]],
+        [["📞 تماس با پشتیبانی"], ["📜 قوانین"], ["👤 پروفایل"]],
         resize_keyboard=True
     )
 
@@ -139,7 +139,7 @@ async def callback(update: Update, context):
 
     data = q.data
 
-    # CHECK CHANNEL
+    # CHECK
     if data == "check":
         if await is_member(context, uid):
             await context.bot.send_message(uid, "✅ عضویت تایید شد", reply_markup=user_menu())
@@ -212,7 +212,7 @@ async def handle(update: Update, context):
     text = update.message.text
     save_user(update.effective_user)
 
-    # ---------------- ADMIN REPLY ENGINE ----------------
+    # ---------------- ADMIN REPLY ----------------
     if uid in ADMIN_IDS and uid in reply_state:
 
         target = reply_state[uid]
@@ -227,45 +227,32 @@ async def handle(update: Update, context):
         del reply_state[uid]
         return
 
+    # ---------------- PROFILE (FIXED) ----------------
+    if text == "👤 پروفایل":
+
+        cur.execute("SELECT COUNT(*) FROM tickets WHERE user_id=?", (uid,))
+        ticket_count = cur.fetchone()[0]
+
+        cur.execute("SELECT AVG(rating) FROM tickets WHERE user_id=? AND rating IS NOT NULL", (uid,))
+        avg = cur.fetchone()[0] or 0
+
+        cur.execute("SELECT status FROM tickets WHERE user_id=? ORDER BY id DESC LIMIT 1", (uid,))
+        last = cur.fetchone()
+        last_status = last[0] if last else "ندارد"
+
+        await update.message.reply_text(
+            f"👤 پروفایل شما\n\n"
+            f"🆔 ID: {uid}\n"
+            f"🎫 تعداد تیکت‌ها: {ticket_count}\n"
+            f"⭐ میانگین رضایت: {round(avg,2)}\n"
+            f"📌 آخرین وضعیت: {last_status}"
+        )
+        return
+
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
 
-        # BROADCAST START
-        if text == "📣 ارسال همگانی":
-            broadcast_mode[uid] = True
-            await update.message.reply_text("✍ پیام یا عکس ارسال کنید")
-            return
-
-        # BROADCAST SEND (FIXED FULL)
-        if broadcast_mode.get(uid):
-
-            cur.execute("SELECT user_id FROM users")
-            users = [r[0] for r in cur.fetchall()]
-
-            photo = update.message.photo
-            caption = update.message.caption or update.message.text or ""
-
-            for u in users:
-                try:
-                    if photo:
-                        await context.bot.send_photo(
-                            chat_id=u,
-                            photo=photo[-1].file_id,
-                            caption=caption
-                        )
-                    else:
-                        await context.bot.send_message(
-                            chat_id=u,
-                            text=f"📢 {caption}"
-                        )
-                except:
-                    pass
-
-            broadcast_mode[uid] = False
-            await update.message.reply_text("✅ ارسال شد")
-            return
-
-        # REPORT PANEL (FIXED + BAN LIST)
+        # REPORT FIXED
         if text == "📊 گزارش پنل":
 
             cur.execute("SELECT COUNT(*) FROM users")
@@ -289,29 +276,45 @@ async def handle(update: Update, context):
                 f"📊 گزارش سیستم\n\n"
                 f"👤 کاربران: {users}\n"
                 f"🎫 تیکت‌ها: {tickets}\n"
-                f"🚫 تعداد بن: {banned_count}\n"
+                f"🚫 بن: {banned_count}\n"
                 f"⭐ میانگین رضایت: {round(avg,2)}\n\n"
                 f"🚫 لیست بن شده‌ها:\n{banned_text}"
             )
             return
 
-        # BAN PANEL
-        if text == "🚫 مدیریت بن":
-            await update.message.reply_text("/ban id | /unban id")
-            return
+        # OPEN TICKETS FIXED
+        if text == "📋 تیکت‌های باز":
 
-        if text.startswith("/ban"):
-            target = int(text.split()[1])
-            cur.execute("INSERT OR IGNORE INTO banned(user_id) VALUES(?)", (target,))
-            db.commit()
-            await update.message.reply_text("🚫 بن شد")
-            return
+            cur.execute("""
+            SELECT id, user_id, username, message
+            FROM tickets
+            WHERE status='open'
+            ORDER BY id DESC
+            """)
 
-        if text.startswith("/unban"):
-            target = int(text.split()[1])
-            cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
-            db.commit()
-            await update.message.reply_text("✅ آنبن شد")
+            rows = cur.fetchall()
+
+            if not rows:
+                await update.message.reply_text("📭 تیکتی نیست")
+                return
+
+            for tid, user, username, msg in rows:
+
+                await update.message.reply_text(
+                    f"""🎫 تیکت #{tid}
+
+👤 کاربر: {username}
+🆔 ID: {user}
+
+📝 پیام:
+{msg}
+""",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{user}")],
+                        [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                        [InlineKeyboardButton("🚫 بن", callback_data=f"ban_{user}")]
+                    ])
+                )
             return
 
     # ---------------- USER ----------------
@@ -352,27 +355,6 @@ async def handle(update: Update, context):
         """, (uid, username, text, "open", int(time.time())))
 
         db.commit()
-
-        tid = cur.lastrowid
-
-        for admin in ADMIN_IDS:
-
-            await context.bot.send_message(
-                admin,
-                f"""🎫 تیکت #{tid}
-
-👤 {update.effective_user.first_name}
-📛 @{username}
-🆔 {uid}
-
-📝 {text}
-""",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-                    [InlineKeyboardButton("🚫 بن", callback_data=f"ban_{uid}")]
-                ])
-            )
 
         await update.message.reply_text("✅ تیکت ثبت شد")
         ticket_mode[uid] = False
