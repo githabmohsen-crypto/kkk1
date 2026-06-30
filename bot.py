@@ -54,14 +54,10 @@ user_id INTEGER PRIMARY KEY
 
 db.commit()
 
-# ---------------- STATE ----------------
+# ---------------- STATES ----------------
 ticket_mode = {}
 broadcast_mode = {}
-
-# ---------------- BAN ----------------
-def is_banned(uid):
-    cur.execute("SELECT 1 FROM banned WHERE user_id=?", (uid,))
-    return cur.fetchone() is not None
+reply_state = {}   # ⭐ FIXED STATE SYSTEM
 
 
 # ---------------- SAVE USER ----------------
@@ -71,6 +67,12 @@ def save_user(user):
     VALUES (?, ?, ?)
     """, (user.id, user.username or "", user.first_name or ""))
     db.commit()
+
+
+# ---------------- BAN CHECK ----------------
+def is_banned(uid):
+    cur.execute("SELECT 1 FROM banned WHERE user_id=?", (uid,))
+    return cur.fetchone() is not None
 
 
 # ---------------- MEMBER CHECK ----------------
@@ -134,7 +136,7 @@ async def start(update: Update, context):
         await update.message.reply_text("👋 خوش آمدید", reply_markup=user_menu())
 
 
-# ---------------- CALLBACK ----------------
+# ---------------- CALLBACK (FULL FIXED) ----------------
 async def callback(update: Update, context):
 
     q = update.callback_query
@@ -143,40 +145,56 @@ async def callback(update: Update, context):
     uid = q.from_user.id
     save_user(q.from_user)
 
-    # CHECK CHANNEL
-    if q.data == "check":
+    data = q.data
+
+
+    # ---------------- CHECK CHANNEL ----------------
+    if data == "check":
         if await is_member(context, uid):
             await context.bot.send_message(uid, "✅ عضویت تایید شد", reply_markup=user_menu())
         return
 
 
-    # START TICKET
-    if q.data == "start_ticket":
+    # ---------------- START TICKET ----------------
+    if data == "start_ticket":
         ticket_mode[uid] = True
         await q.message.reply_text("✍ پیام خود را ارسال کنید")
         return
 
 
-    # COPY ID (FIXED)
-    if q.data.startswith("copy_"):
-        user_id = q.data.split("_")[1]
+    # ---------------- COPY ID (FIXED) ----------------
+    if data.startswith("copy_"):
+        user_id = data.split("_")[1]
         await q.answer(text=f"ID: {user_id}", show_alert=True)
         return
 
 
-    # BAN (FIXED)
-    if q.data.startswith("ban_"):
-        target = int(q.data.split("_")[1])
+    # ---------------- BAN (FIXED) ----------------
+    if data.startswith("ban_"):
+        target = int(data.split("_")[1])
+
         cur.execute("INSERT OR IGNORE INTO banned(user_id) VALUES(?)", (target,))
         db.commit()
+
         await q.message.reply_text("🚫 بن شد")
         return
 
 
-    # CLOSE + SEND RATING TO USER (FIXED)
-    if q.data.startswith("close_"):
+    # ---------------- REPLY (FIXED CORE) ----------------
+    if data.startswith("reply_"):
 
-        tid = int(q.data.split("_")[1])
+        target = int(data.split("_")[1])
+
+        reply_state[uid] = target
+
+        await q.message.reply_text("✉ پاسخ را بنویس")
+        return
+
+
+    # ---------------- CLOSE + RATING ----------------
+    if data.startswith("close_"):
+
+        tid = int(data.split("_")[1])
 
         cur.execute("SELECT user_id FROM tickets WHERE id=?", (tid,))
         user_id = cur.fetchone()[0]
@@ -199,10 +217,10 @@ async def callback(update: Update, context):
         return
 
 
-    # RATING SAVE
-    if q.data.startswith("rate_"):
+    # ---------------- RATING ----------------
+    if data.startswith("rate_"):
 
-        _, tid, score = q.data.split("_")
+        _, tid, score = data.split("_")
 
         cur.execute("UPDATE tickets SET rating=? WHERE id=?", (int(score), tid))
         db.commit()
@@ -211,7 +229,7 @@ async def callback(update: Update, context):
         return
 
 
-# ---------------- HANDLE ----------------
+# ---------------- HANDLE (FIXED ORDER IMPORTANT) ----------------
 async def handle(update: Update, context):
 
     if not await enforce_channel(update, context):
@@ -221,6 +239,22 @@ async def handle(update: Update, context):
     text = update.message.text
 
     save_user(update.effective_user)
+
+
+    # ---------------- ADMIN REPLY HANDLER (CRITICAL FIX) ----------------
+    if uid in ADMIN_IDS and uid in reply_state:
+
+        target = reply_state[uid]
+
+        await context.bot.send_message(
+            target,
+            f"📩 پاسخ پشتیبانی:\n\n{text}"
+        )
+
+        await update.message.reply_text("✅ ارسال شد")
+
+        del reply_state[uid]
+        return
 
 
     # ---------------- ADMIN ----------------
