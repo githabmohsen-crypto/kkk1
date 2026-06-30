@@ -354,31 +354,33 @@ async def handle(update: Update, context):
         return
 
     if ticket_mode.get(uid):
-
+    
         username = update.effective_user.username or "ندارد"
-
+    
         cur.execute("""
         INSERT INTO tickets(user_id, username, message, status, created)
         VALUES (?, ?, ?, ?, ?)
-        """, (uid, username, text, "open", int(time.time())))
+        """, (uid, username, text or caption, "open", int(time.time())))
         db.commit()
-
+    
         tid = cur.lastrowid
-
+    
         cur.execute("UPDATE profiles SET tickets_count = tickets_count + 1 WHERE user_id=?", (uid,))
         db.commit()
-
+    
         for admin in ADMIN_IDS:
-            await context.bot.send_message(
-                admin,
-                f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {text}",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-                    [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
-                ])
-            )
-
+            if photo:
+                await context.bot.send_photo(
+                    admin,
+                    photo[-1].file_id,
+                    caption=f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {caption or ''}"
+                )
+            else:
+                await context.bot.send_message(
+                    admin,
+                    f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {text}"
+                )
+    
         await update.message.reply_text("✅ تیکت ثبت شد")
         ticket_mode[uid] = False
         return
