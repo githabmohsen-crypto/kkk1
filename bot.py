@@ -481,11 +481,12 @@ async def unban_cmd(update: Update, context):
     
     await update.message.reply_text(f"✅ کاربر {target} از بن خارج شد")
 # ---------------- RUN ----------------
-app.add_handler(CommandHandler("unban", unban_cmd))
 app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(callback))
 app.add_handler(MessageHandler(filters.ALL, handle))
+
+app.add_handler(CommandHandler("unban", unban_cmd))
 
 app.run_polling()
