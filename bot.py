@@ -54,16 +54,23 @@ user_id INTEGER PRIMARY KEY
 
 db.commit()
 
-# ---------------- STATES ----------------
+# ---------------- STATE ----------------
 ticket_mode = {}
-reply_mode = {}
 broadcast_mode = {}
-
 
 # ---------------- BAN ----------------
 def is_banned(uid):
     cur.execute("SELECT 1 FROM banned WHERE user_id=?", (uid,))
     return cur.fetchone() is not None
+
+
+# ---------------- SAVE USER ----------------
+def save_user(user):
+    cur.execute("""
+    INSERT OR IGNORE INTO users(user_id, username, first_name)
+    VALUES (?, ?, ?)
+    """, (user.id, user.username or "", user.first_name or ""))
+    db.commit()
 
 
 # ---------------- MEMBER CHECK ----------------
@@ -73,19 +80,6 @@ async def is_member(context, user_id):
         return m.status in ["member", "administrator", "creator"]
     except:
         return False
-
-
-# ---------------- SAVE USER (PROFILE SYSTEM) ----------------
-def save_user(user):
-    cur.execute("""
-    INSERT OR IGNORE INTO users(user_id, username, first_name)
-    VALUES (?, ?, ?)
-    """, (
-        user.id,
-        user.username or "",
-        user.first_name or ""
-    ))
-    db.commit()
 
 
 # ---------------- ENFORCE ----------------
@@ -114,7 +108,7 @@ async def enforce_channel(update, context):
 # ---------------- MENUS ----------------
 def user_menu():
     return ReplyKeyboardMarkup(
-        [["📞 تماس با پشتیبانی"], ["📜 قوانین"], ["👤 پروفایل"]],
+        [["📞 تماس با پشتیبانی"], ["📜 قوانین"]],
         resize_keyboard=True
     )
 
@@ -163,14 +157,23 @@ async def callback(update: Update, context):
         return
 
 
-    # COPY ID
+    # COPY ID (FIXED)
     if q.data.startswith("copy_"):
         user_id = q.data.split("_")[1]
-        await q.answer(text=user_id, show_alert=True)
+        await q.answer(text=f"ID: {user_id}", show_alert=True)
         return
 
 
-    # CLOSE + RATING
+    # BAN (FIXED)
+    if q.data.startswith("ban_"):
+        target = int(q.data.split("_")[1])
+        cur.execute("INSERT OR IGNORE INTO banned(user_id) VALUES(?)", (target,))
+        db.commit()
+        await q.message.reply_text("🚫 بن شد")
+        return
+
+
+    # CLOSE + SEND RATING TO USER (FIXED)
     if q.data.startswith("close_"):
 
         tid = int(q.data.split("_")[1])
@@ -219,63 +222,31 @@ async def handle(update: Update, context):
 
     save_user(update.effective_user)
 
+
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
 
-        # REPORT + USERS + BAN LIST
-        if text == "📊 گزارش پنل":
 
-            cur.execute("SELECT COUNT(*) FROM users")
-            users = cur.fetchone()[0]
-
-            cur.execute("SELECT COUNT(*) FROM tickets")
-            tickets = cur.fetchone()[0]
-
-            cur.execute("SELECT COUNT(*) FROM banned")
-            banned = cur.fetchone()[0]
-
-            cur.execute("SELECT AVG(rating) FROM tickets WHERE rating IS NOT NULL")
-            avg = cur.fetchone()[0] or 0
-
-            cur.execute("SELECT user_id, username, first_name FROM users")
-            all_users = cur.fetchall()
-
-            cur.execute("SELECT user_id FROM banned")
-            banned_list = cur.fetchall()
-
-            await update.message.reply_text(
-                f"📊 گزارش سیستم\n\n"
-                f"👤 کاربران: {users}\n"
-                f"🎫 تیکت‌ها: {tickets}\n"
-                f"🚫 بن: {banned}\n"
-                f"⭐ میانگین رضایت: {round(avg,2)}"
-            )
-
-            return
-
-
-        # BROADCAST START
+        # BROADCAST
         if text == "📣 ارسال همگانی":
             broadcast_mode[uid] = True
             await update.message.reply_text("✍ متن یا عکس ارسال کنید")
             return
 
 
-        # BROADCAST SEND (FIXED - ALL USERS)
         if broadcast_mode.get(uid):
 
             cur.execute("SELECT user_id FROM users")
             users = [r[0] for r in cur.fetchall()]
 
             photo = update.message.photo
-            caption = update.message.text or ""
 
             for u in users:
                 try:
                     if photo:
-                        await context.bot.send_photo(u, photo[-1].file_id, caption=caption)
+                        await context.bot.send_photo(u, photo[-1].file_id, caption=text or "")
                     else:
-                        await context.bot.send_message(u, f"📢 {caption}")
+                        await context.bot.send_message(u, f"📢 {text}")
                 except:
                     pass
 
@@ -284,19 +255,19 @@ async def handle(update: Update, context):
             return
 
 
-        # BAN SYSTEM
+        # BAN PANEL
         if text == "🚫 مدیریت بن":
             await update.message.reply_text("/ban id | /unban id")
             return
 
-        if text and text.startswith("/ban"):
+        if text.startswith("/ban"):
             target = int(text.split()[1])
             cur.execute("INSERT OR IGNORE INTO banned(user_id) VALUES(?)", (target,))
             db.commit()
             await update.message.reply_text("🚫 بن شد")
             return
 
-        if text and text.startswith("/unban"):
+        if text.startswith("/unban"):
             target = int(text.split()[1])
             cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
             db.commit()
@@ -304,34 +275,7 @@ async def handle(update: Update, context):
             return
 
 
-        # REPLY
-        if uid in reply_mode:
-
-            target = reply_mode[uid]
-
-            await context.bot.send_message(target, f"📩 پاسخ:\n\n{text}")
-
-            await update.message.reply_text("✅ ارسال شد")
-            del reply_mode[uid]
-            return
-
-
     # ---------------- USER ----------------
-
-    if text == "👤 پروفایل":
-
-        cur.execute("SELECT user_id, username, first_name FROM users WHERE user_id=?", (uid,))
-        data = cur.fetchone()
-
-        if data:
-            await update.message.reply_text(
-                f"👤 پروفایل شما\n\n"
-                f"🆔 ID: {data[0]}\n"
-                f"📛 Username: @{data[1] if data[1] else 'ندارد'}\n"
-                f"👤 Name: {data[2]}"
-            )
-        return
-
 
     if text == "📜 قوانین":
         await update.message.reply_text(
@@ -361,7 +305,7 @@ async def handle(update: Update, context):
         return
 
 
-    # TICKET
+    # ---------------- TICKET ----------------
     if ticket_mode.get(uid):
 
         username = update.effective_user.username or "ندارد"
