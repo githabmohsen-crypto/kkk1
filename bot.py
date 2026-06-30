@@ -461,10 +461,27 @@ async def handle(update: Update, context):
         await update.message.reply_text("✅ تیکت ثبت شد")
         ticket_mode[uid] = False
         return
-
+    async def unban_cmd(update: Update, context):
+    
+        uid = update.effective_user.id
+    
+        if uid not in ADMIN_IDS:
+            await update.message.reply_text("⛔ دسترسی ندارید")
+            return
+    
+        if len(context.args) == 0:
+            await update.message.reply_text("❌ مثال: /unban 123456")
+            return
+    
+        target = int(context.args[0])
+    
+        cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
+        db.commit()
+    
+        await update.message.reply_text(f"✅ کاربر {target} از بن خارج شد")
 # ---------------- RUN ----------------
 app = Application.builder().token(TOKEN).build()
-
+app.add_handler(CommandHandler("unban", unban_cmd))
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(callback))
 app.add_handler(MessageHandler(filters.ALL, handle))
