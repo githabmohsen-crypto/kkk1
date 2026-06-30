@@ -28,7 +28,9 @@ cur = db.cursor()
 
 cur.execute("""
 CREATE TABLE IF NOT EXISTS users(
-user_id INTEGER PRIMARY KEY
+user_id INTEGER PRIMARY KEY,
+username TEXT,
+first_name TEXT
 )
 """)
 
@@ -56,16 +58,15 @@ db.commit()
 ticket_mode = {}
 reply_mode = {}
 broadcast_mode = {}
-rating_mode = {}
 
 
-# ---------------- BAN CHECK ----------------
+# ---------------- BAN ----------------
 def is_banned(uid):
     cur.execute("SELECT 1 FROM banned WHERE user_id=?", (uid,))
     return cur.fetchone() is not None
 
 
-# ---------------- MEMBERSHIP ----------------
+# ---------------- MEMBER CHECK ----------------
 async def is_member(context, user_id):
     try:
         m = await context.bot.get_chat_member(CHANNEL, user_id)
@@ -74,14 +75,24 @@ async def is_member(context, user_id):
         return False
 
 
+# ---------------- SAVE USER (PROFILE SYSTEM) ----------------
+def save_user(user):
+    cur.execute("""
+    INSERT OR IGNORE INTO users(user_id, username, first_name)
+    VALUES (?, ?, ?)
+    """, (
+        user.id,
+        user.username or "",
+        user.first_name or ""
+    ))
+    db.commit()
+
+
 # ---------------- ENFORCE ----------------
 async def enforce_channel(update, context):
 
     uid = update.effective_user.id
-
-    # save all users
-    cur.execute("INSERT OR IGNORE INTO users(user_id) VALUES(?)", (uid,))
-    db.commit()
+    save_user(update.effective_user)
 
     if is_banned(uid):
         await update.message.reply_text("🚫 شما از سیستم مسدود شده‌اید")
@@ -103,7 +114,7 @@ async def enforce_channel(update, context):
 # ---------------- MENUS ----------------
 def user_menu():
     return ReplyKeyboardMarkup(
-        [["📞 تماس با پشتیبانی"], ["📜 قوانین"]],
+        [["📞 تماس با پشتیبانی"], ["📜 قوانین"], ["👤 پروفایل"]],
         resize_keyboard=True
     )
 
@@ -136,20 +147,12 @@ async def callback(update: Update, context):
     await q.answer()
 
     uid = q.from_user.id
+    save_user(q.from_user)
 
     # CHECK CHANNEL
     if q.data == "check":
         if await is_member(context, uid):
             await context.bot.send_message(uid, "✅ عضویت تایید شد", reply_markup=user_menu())
-        else:
-            await context.bot.send_message(
-                uid,
-                "❌ هنوز عضو کانال نیستید!",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("📢 عضویت", url="https://t.me/Kaletek_news")],
-                    [InlineKeyboardButton("🔄 بررسی مجدد", callback_data="check")]
-                ])
-            )
         return
 
 
@@ -160,15 +163,14 @@ async def callback(update: Update, context):
         return
 
 
-    # REPLY
-    if q.data.startswith("reply_"):
-        target = int(q.data.split("_")[1])
-        reply_mode[uid] = target
-        await q.message.reply_text("✉ پاسخ را بنویس")
+    # COPY ID
+    if q.data.startswith("copy_"):
+        user_id = q.data.split("_")[1]
+        await q.answer(text=user_id, show_alert=True)
         return
 
 
-    # CLOSE + SEND RATING TO CUSTOMER (FIXED)
+    # CLOSE + RATING
     if q.data.startswith("close_"):
 
         tid = int(q.data.split("_")[1])
@@ -215,12 +217,76 @@ async def handle(update: Update, context):
     uid = update.effective_user.id
     text = update.message.text
 
+    save_user(update.effective_user)
 
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
 
+        # REPORT + USERS + BAN LIST
+        if text == "📊 گزارش پنل":
+
+            cur.execute("SELECT COUNT(*) FROM users")
+            users = cur.fetchone()[0]
+
+            cur.execute("SELECT COUNT(*) FROM tickets")
+            tickets = cur.fetchone()[0]
+
+            cur.execute("SELECT COUNT(*) FROM banned")
+            banned = cur.fetchone()[0]
+
+            cur.execute("SELECT AVG(rating) FROM tickets WHERE rating IS NOT NULL")
+            avg = cur.fetchone()[0] or 0
+
+            cur.execute("SELECT user_id, username, first_name FROM users")
+            all_users = cur.fetchall()
+
+            cur.execute("SELECT user_id FROM banned")
+            banned_list = cur.fetchall()
+
+            await update.message.reply_text(
+                f"📊 گزارش سیستم\n\n"
+                f"👤 کاربران: {users}\n"
+                f"🎫 تیکت‌ها: {tickets}\n"
+                f"🚫 بن: {banned}\n"
+                f"⭐ میانگین رضایت: {round(avg,2)}"
+            )
+
+            return
+
+
+        # BROADCAST START
+        if text == "📣 ارسال همگانی":
+            broadcast_mode[uid] = True
+            await update.message.reply_text("✍ متن یا عکس ارسال کنید")
+            return
+
+
+        # BROADCAST SEND (FIXED - ALL USERS)
+        if broadcast_mode.get(uid):
+
+            cur.execute("SELECT user_id FROM users")
+            users = [r[0] for r in cur.fetchall()]
+
+            photo = update.message.photo
+            caption = update.message.text or ""
+
+            for u in users:
+                try:
+                    if photo:
+                        await context.bot.send_photo(u, photo[-1].file_id, caption=caption)
+                    else:
+                        await context.bot.send_message(u, f"📢 {caption}")
+                except:
+                    pass
+
+            broadcast_mode[uid] = False
+            await update.message.reply_text("✅ ارسال شد")
+            return
+
+
+        # BAN SYSTEM
         if text == "🚫 مدیریت بن":
-            await update.message.reply_text("✍ /ban id | /unban id")
+            await update.message.reply_text("/ban id | /unban id")
             return
 
         if text and text.startswith("/ban"):
@@ -238,72 +304,12 @@ async def handle(update: Update, context):
             return
 
 
-        if text == "📊 گزارش پنل":
-
-            cur.execute("SELECT COUNT(*) FROM users")
-            users = cur.fetchone()[0]
-
-            cur.execute("SELECT COUNT(*) FROM tickets")
-            tickets = cur.fetchone()[0]
-
-            cur.execute("SELECT COUNT(*) FROM banned")
-            banned = cur.fetchone()[0]
-
-            cur.execute("SELECT AVG(rating) FROM tickets WHERE rating IS NOT NULL")
-            avg = cur.fetchone()[0] or 0
-
-            cur.execute("SELECT user_id FROM banned")
-            banned_list = cur.fetchall()
-
-            banned_text = "\n".join([str(x[0]) for x in banned_list]) if banned_list else "ندارد"
-
-            await update.message.reply_text(
-                f"📊 گزارش سیستم\n\n"
-                f"👤 کاربران: {users}\n"
-                f"🎫 تیکت‌ها: {tickets}\n"
-                f"🚫 بن: {banned}\n"
-                f"⭐ میانگین رضایت: {round(avg,2)}\n\n"
-                f"🚫 لیست بن‌ها:\n{banned_text}"
-            )
-            return
-
-
-        if text == "📣 ارسال همگانی":
-            broadcast_mode[uid] = True
-            await update.message.reply_text("✍ متن یا عکس ارسال کنید")
-            return
-
-
-        if broadcast_mode.get(uid):
-
-            cur.execute("SELECT user_id FROM users")
-            users = [r[0] for r in cur.fetchall()]
-
-            photo = update.message.photo
-            caption = text
-
-            for u in users:
-                try:
-                    if photo:
-                        await context.bot.send_photo(u, photo[-1].file_id, caption=caption or "")
-                    else:
-                        await context.bot.send_message(u, f"📢 {caption}")
-                except:
-                    pass
-
-            broadcast_mode[uid] = False
-            await update.message.reply_text("✅ ارسال شد")
-            return
-
-
+        # REPLY
         if uid in reply_mode:
 
             target = reply_mode[uid]
 
-            await context.bot.send_message(
-                target,
-                f"📩 پاسخ پشتیبانی:\n\n{text}"
-            )
+            await context.bot.send_message(target, f"📩 پاسخ:\n\n{text}")
 
             await update.message.reply_text("✅ ارسال شد")
             del reply_mode[uid]
@@ -311,64 +317,88 @@ async def handle(update: Update, context):
 
 
     # ---------------- USER ----------------
-    if uid not in ADMIN_IDS:
 
-        if text == "📜 قوانین":
+    if text == "👤 پروفایل":
+
+        cur.execute("SELECT user_id, username, first_name FROM users WHERE user_id=?", (uid,))
+        data = cur.fetchone()
+
+        if data:
             await update.message.reply_text(
-                "📜 قوانین سیستم پشتیبانی Kaletek\n\n"
-                "1️⃣ احترام الزامی است\n"
-                "2️⃣ هر تیکت یک موضوع مشخص\n"
-                "3️⃣ ارسال اسپم ممنوع\n"
-                "4️⃣ توضیحات کامل بنویسید\n"
-                "5️⃣ ارتباط مستقیم با ادمین ممنوع\n"
-                "6️⃣ زمان پاسخ‌گویی ممکن است متفاوت باشد\n"
-                "7️⃣ اطلاعات حساس ارسال نکنید\n\n"
-                "━━━━━━━━━━━━\n"
-                "💙 با استفاده از ربات قوانین را پذیرفته‌اید"
+                f"👤 پروفایل شما\n\n"
+                f"🆔 ID: {data[0]}\n"
+                f"📛 Username: @{data[1] if data[1] else 'ندارد'}\n"
+                f"👤 Name: {data[2]}"
             )
-            return
+        return
 
 
-        if text == "📞 تماس با پشتیبانی":
-            await update.message.reply_text(
-                "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه پایین استفاده کنید.\n\n"
-                "‼️ لطفاً موضوع را در قالب یک پیام منسجم و واضح بنویسید؛ این کار باعث می‌شود پاسخگویی سریع‌تر انجام شود 💙\n\n"
-                "✅ با لمس دکمه زیر، گفتگو با تیم پشتیبانی آغاز می‌شود.",
+    if text == "📜 قوانین":
+        await update.message.reply_text(
+            "📜 قوانین سیستم پشتیبانی Kaletek\n\n"
+            "1️⃣ احترام الزامی است\n"
+            "2️⃣ هر تیکت یک موضوع مشخص\n"
+            "3️⃣ ارسال اسپم ممنوع\n"
+            "4️⃣ توضیحات کامل بنویسید\n"
+            "5️⃣ ارتباط مستقیم با ادمین ممنوع\n"
+            "6️⃣ زمان پاسخ‌گویی ممکن است متفاوت باشد\n"
+            "7️⃣ اطلاعات حساس ارسال نکنید\n\n"
+            "━━━━━━━━━━━━\n"
+            "💙 با استفاده از ربات قوانین را پذیرفته‌اید"
+        )
+        return
+
+
+    if text == "📞 تماس با پشتیبانی":
+        await update.message.reply_text(
+            "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه پایین استفاده کنید.\n\n"
+            "‼️ لطفاً موضوع را در قالب یک پیام منسجم و واضح بنویسید 💙\n\n"
+            "✅ با لمس دکمه زیر، گفتگو با تیم پشتیبانی آغاز می‌شود.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
+            ])
+        )
+        return
+
+
+    # TICKET
+    if ticket_mode.get(uid):
+
+        username = update.effective_user.username or "ندارد"
+
+        cur.execute("""
+        INSERT INTO tickets(user_id, username, message, status, created)
+        VALUES (?, ?, ?, ?, ?)
+        """, (uid, username, text, "open", int(time.time())))
+
+        db.commit()
+
+        tid = cur.lastrowid
+
+        for admin in ADMIN_IDS:
+
+            await context.bot.send_message(
+                admin,
+                f"""🎫 تیکت #{tid}
+
+👤 نام: {update.effective_user.first_name}
+📛 یوزرنیم: @{username}
+🆔 ID: {uid}
+
+📝 پیام:
+{text}
+""",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
+                    [InlineKeyboardButton("📋 کپی ID", callback_data=f"copy_{uid}")],
+                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                    [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
                 ])
             )
-            return
 
-
-        if ticket_mode.get(uid):
-
-            username = update.effective_user.username or "ندارد"
-
-            cur.execute("""
-            INSERT INTO tickets(user_id, username, message, status, created)
-            VALUES (?, ?, ?, ?, ?)
-            """, (uid, username, text, "open", int(time.time())))
-
-            db.commit()
-
-            tid = cur.lastrowid
-
-            for admin in ADMIN_IDS:
-
-                await context.bot.send_message(
-                    admin,
-                    f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {text}",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-                        [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-                        [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
-                    ])
-                )
-
-            await update.message.reply_text("✅ تیکت ثبت شد")
-            ticket_mode[uid] = False
-            return
+        await update.message.reply_text("✅ تیکت ثبت شد")
+        ticket_mode[uid] = False
+        return
 
 
 # ---------------- RUN ----------------
