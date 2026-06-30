@@ -44,7 +44,7 @@ ticket_mode = {}
 reply_mode = {}
 
 
-# ---------------- CHECK MEMBER ----------------
+# ---------------- CHECK MEMBERSHIP ----------------
 async def is_member(context, user_id):
     try:
         m = await context.bot.get_chat_member(CHANNEL, user_id)
@@ -101,7 +101,7 @@ async def start(update: Update, context):
     if uid in ADMIN_IDS:
         await update.message.reply_text("🛠 پنل ادمین", reply_markup=admin_menu())
     else:
-        await update.message.reply_text("👋 Kaletek Support خوش آمدید به ربات", reply_markup=user_menu())
+        await update.message.reply_text("👋 خوش آمدید", reply_markup=user_menu())
 
 
 # ---------------- CALLBACK ----------------
@@ -112,8 +112,7 @@ async def callback(update: Update, context):
 
     uid = q.from_user.id
 
-
-    # -------- CHECK MEMBER --------
+    # ---------------- CHECK ----------------
     if q.data == "check":
 
         if await is_member(context, uid):
@@ -137,7 +136,7 @@ async def callback(update: Update, context):
         return
 
 
-    # -------- START TICKET --------
+    # ---------------- START TICKET ----------------
     if q.data == "start_ticket":
 
         ticket_mode[uid] = True
@@ -147,7 +146,7 @@ async def callback(update: Update, context):
         return
 
 
-    # -------- REPLY --------
+    # ---------------- REPLY ----------------
     if q.data.startswith("reply_"):
 
         target = int(q.data.split("_")[1])
@@ -159,7 +158,7 @@ async def callback(update: Update, context):
         return
 
 
-    # -------- CLOSE --------
+    # ---------------- CLOSE ----------------
     if q.data.startswith("close_"):
 
         tid = int(q.data.split("_")[1])
@@ -185,7 +184,7 @@ async def handle(update: Update, context):
     text = update.message.text
 
 
-    # -------- ADMIN REPLY --------
+    # ---------------- ADMIN REPLY ----------------
     if uid in ADMIN_IDS and uid in reply_mode:
 
         target = reply_mode[uid]
@@ -201,11 +200,11 @@ async def handle(update: Update, context):
         return
 
 
-    # -------- USER --------
+    # ---------------- USER ----------------
     if uid not in ADMIN_IDS:
 
 
-        # ---------------- RULES ----------------
+        # ================= RULES (بدون تغییر متن) =================
         if text == "📜 قوانین":
 
             await update.message.reply_text(
@@ -223,7 +222,7 @@ async def handle(update: Update, context):
             return
 
 
-        # ---------------- CONTACT ----------------
+        # ================= CONTACT (بدون تغییر متن) =================
         if text == "📞 تماس با پشتیبانی":
 
             await update.message.reply_text(
@@ -237,28 +236,33 @@ async def handle(update: Update, context):
             return
 
 
-        # ---------------- TICKET MODE ----------------
+        # ================= TICKET MODE (FIX MEDIA) =================
         if ticket_mode.get(uid):
 
-            content = text
+            message_type = "text"
+            file_id = None
+            caption = text
 
             if update.message.photo:
-                content = "📷 عکس"
+                message_type = "photo"
+                file_id = update.message.photo[-1].file_id
 
             elif update.message.video:
-                content = "🎥 ویدیو"
+                message_type = "video"
+                file_id = update.message.video.file_id
 
             elif update.message.document:
-                content = "📎 فایل"
+                message_type = "document"
+                file_id = update.message.document.file_id
+
 
             cur.execute("""
-            INSERT INTO tickets
-            (user_id, username, message, status, created)
+            INSERT INTO tickets(user_id, username, message, status, created)
             VALUES (?, ?, ?, ?, ?)
             """, (
                 uid,
                 update.effective_user.username,
-                content,
+                caption,
                 "open",
                 int(time.time())
             ))
@@ -269,16 +273,47 @@ async def handle(update: Update, context):
 
             for admin in ADMIN_IDS:
 
+                base_caption = f"🎫 تیکت #{tid}\n👤 {uid}\n\n📝 {caption}"
+
                 keyboard = InlineKeyboardMarkup([
                     [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
                     [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")]
                 ])
 
-                await context.bot.send_message(
-                    admin,
-                    f"🎫 تیکت #{tid}\n👤 {uid}\n\n📝 {content}",
-                    reply_markup=keyboard
-                )
+                if message_type == "photo":
+
+                    await context.bot.send_photo(
+                        admin,
+                        file_id,
+                        caption=base_caption,
+                        reply_markup=keyboard
+                    )
+
+                elif message_type == "video":
+
+                    await context.bot.send_video(
+                        admin,
+                        file_id,
+                        caption=base_caption,
+                        reply_markup=keyboard
+                    )
+
+                elif message_type == "document":
+
+                    await context.bot.send_document(
+                        admin,
+                        file_id,
+                        caption=base_caption,
+                        reply_markup=keyboard
+                    )
+
+                else:
+
+                    await context.bot.send_message(
+                        admin,
+                        base_caption,
+                        reply_markup=keyboard
+                    )
 
             await update.message.reply_text(f"✅ تیکت #{tid} ثبت شد")
 
@@ -286,7 +321,7 @@ async def handle(update: Update, context):
             return
 
 
-    # -------- ADMIN PANEL --------
+    # ---------------- ADMIN PANEL ----------------
     if uid in ADMIN_IDS:
 
         if text == "📋 تیکت‌های باز":
