@@ -395,11 +395,6 @@ async def handle(update: Update, context):
                     [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
                     [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]    
             if photo:
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-                [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-                [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
-            ])
             
             await context.bot.send_photo(
                 admin,
@@ -409,11 +404,6 @@ async def handle(update: Update, context):
             )
                 )/*************************
             else:
-                keyboard = InlineKeyboardMarkup([
-                    
-                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-                    [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
             ])
             await context.bot.send_message(
                 admin,
