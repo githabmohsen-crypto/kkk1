@@ -68,6 +68,7 @@ db.commit()
 ticket_mode = {}
 reply_mode = {}
 broadcast_mode = {}
+unban_mode = {}
 
 # ---------------- BAN ----------------
 def is_banned(uid):
@@ -247,6 +248,17 @@ async def callback(update: Update, context):
 
 # ---------------- HANDLE ----------------
 async def handle(update: Update, context):
+    if uid in ADMIN_IDS and unban_mode.get(uid):
+
+        target = int(text)
+    
+        cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
+        db.commit()
+    
+        await update.message.reply_text(f"✅ کاربر {target} رفع بن شد")
+    
+        unban_mode[uid] = False
+        return
 
     if not await enforce_channel(update, context):
         return
@@ -265,9 +277,9 @@ async def handle(update: Update, context):
             await update.message.reply_text("✍ پیام همگانی را ارسال کنید")
             return
         if text == "🚫 مدیریت بن":
-            cur.execute("SELECT user_id FROM banned")
-            rows = cur.fetchall()
-        
+            unban_mode[uid] = True
+            await update.message.reply_text("✍ آیدی عددی کاربر را ارسال کنید")
+            return
             if not rows:
                 await update.message.reply_text("لیست بن خالی است")
                 return
