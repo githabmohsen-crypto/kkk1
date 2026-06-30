@@ -171,20 +171,27 @@ async def callback(update: Update, context):
         return
 
     if q.data.startswith("close_"):
-
+    
         tid = int(q.data.split("_")[1])
-
+    
         cur.execute("SELECT user_id FROM tickets WHERE id=?", (tid,))
         row = cur.fetchone()
+    
         if not row:
+            await q.answer("تیکت پیدا نشد", show_alert=True)
             return
-
+    
         user_id = row[0]
-
+    
         cur.execute("UPDATE tickets SET status='closed' WHERE id=?", (tid,))
         db.commit()
-
+    
         await q.edit_message_text("✔ بسته شد")
+    
+        await context.bot.send_message(
+            user_id,
+            "🙏 تیکت شما بسته شد"
+        )
 
         await context.bot.send_message(
             user_id,
@@ -306,7 +313,16 @@ async def handle(update: Update, context):
             target = reply_mode[uid]
 
             if photo:
-                await context.bot.send_photo(target, photo[-1].file_id, caption=caption or "")
+                await context.bot.send_photo(
+                    admin,
+                    photo=photo[-1].file_id,
+                    caption=f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {caption or ''}",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                        [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                        [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+                    ])
+                )
             else:
                 await context.bot.send_message(target, f"📩 پاسخ پشتیبانی:\n\n{text}")
 
