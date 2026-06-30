@@ -19,6 +19,9 @@ from telegram.ext import (
 
 # ---------------- CONFIG ----------------
 TOKEN = os.environ.get("BOT_TOKEN")
+if not TOKEN:
+    raise RuntimeError("BOT_TOKEN is not set!")
+
 CHANNEL = "@Kaletek_news"
 ADMIN_IDS = [8815017184]
 
@@ -50,20 +53,26 @@ user_id INTEGER PRIMARY KEY
 )
 """)
 
+cur.execute("""
+CREATE TABLE IF NOT EXISTS profiles(
+user_id INTEGER PRIMARY KEY,
+username TEXT,
+join_time INTEGER,
+tickets_count INTEGER DEFAULT 0
+)
+""")
+
 db.commit()
 
 # ---------------- STATES ----------------
 ticket_mode = {}
 reply_mode = {}
 broadcast_mode = {}
-rating_mode = {}
-
 
 # ---------------- BAN CHECK ----------------
 def is_banned(uid):
     cur.execute("SELECT 1 FROM banned WHERE user_id=?", (uid,))
     return cur.fetchone() is not None
-
 
 # ---------------- MEMBERSHIP ----------------
 async def is_member(context, user_id):
@@ -73,14 +82,23 @@ async def is_member(context, user_id):
     except:
         return False
 
-
 # ---------------- ENFORCE ----------------
 async def enforce_channel(update, context):
 
     uid = update.effective_user.id
 
-    # save all users
     cur.execute("INSERT OR IGNORE INTO users(user_id) VALUES(?)", (uid,))
+    db.commit()
+
+    # create profile
+    cur.execute("""
+    INSERT OR IGNORE INTO profiles(user_id, username, join_time, tickets_count)
+    VALUES (?, ?, ?, 0)
+    """, (
+        uid,
+        update.effective_user.username or "ندارد",
+        int(time.time())
+    ))
     db.commit()
 
     if is_banned(uid):
@@ -99,21 +117,18 @@ async def enforce_channel(update, context):
 
     return True
 
-
 # ---------------- MENUS ----------------
 def user_menu():
     return ReplyKeyboardMarkup(
-        [["📞 تماس با پشتیبانی"], ["📜 قوانین"]],
+        [["👤 پروفایل من"], ["📞 تماس با پشتیبانی"], ["📜 قوانین"]],
         resize_keyboard=True
     )
-
 
 def admin_menu():
     return ReplyKeyboardMarkup(
         [["📋 تیکت‌های باز"], ["📊 گزارش پنل"], ["📣 ارسال همگانی"], ["🚫 مدیریت بن"]],
         resize_keyboard=True
     )
-
 
 # ---------------- START ----------------
 async def start(update: Update, context):
@@ -128,7 +143,6 @@ async def start(update: Update, context):
     else:
         await update.message.reply_text("👋 خوش آمدید", reply_markup=user_menu())
 
-
 # ---------------- CALLBACK ----------------
 async def callback(update: Update, context):
 
@@ -137,7 +151,6 @@ async def callback(update: Update, context):
 
     uid = q.from_user.id
 
-    # CHECK CHANNEL
     if q.data == "check":
         if await is_member(context, uid):
             await context.bot.send_message(uid, "✅ عضویت تایید شد", reply_markup=user_menu())
@@ -152,29 +165,24 @@ async def callback(update: Update, context):
             )
         return
 
-
-    # START TICKET
-    if q.data == "start_ticket":
-        ticket_mode[uid] = True
-        await q.message.reply_text("✍ پیام خود را ارسال کنید")
-        return
-
-
-    # REPLY
+    # reply start
     if q.data.startswith("reply_"):
         target = int(q.data.split("_")[1])
         reply_mode[uid] = target
         await q.message.reply_text("✉ پاسخ را بنویس")
         return
 
-
-    # CLOSE + SEND RATING TO CUSTOMER (FIXED)
+    # close ticket
     if q.data.startswith("close_"):
 
         tid = int(q.data.split("_")[1])
 
         cur.execute("SELECT user_id FROM tickets WHERE id=?", (tid,))
-        user_id = cur.fetchone()[0]
+        row = cur.fetchone()
+        if not row:
+            return
+
+        user_id = row[0]
 
         cur.execute("UPDATE tickets SET status='closed' WHERE id=?", (tid,))
         db.commit()
@@ -193,10 +201,8 @@ async def callback(update: Update, context):
         )
         return
 
-
-    # RATING SAVE
+    # rating
     if q.data.startswith("rate_"):
-
         _, tid, score = q.data.split("_")
 
         cur.execute("UPDATE tickets SET rating=? WHERE id=?", (int(score), tid))
@@ -205,6 +211,13 @@ async def callback(update: Update, context):
         await q.message.edit_text("🙏 ممنون از ثبت نظر شما 💙")
         return
 
+    # ban
+    if q.data.startswith("ban_"):
+        target = int(q.data.split("_")[1])
+        cur.execute("INSERT OR IGNORE INTO banned(user_id) VALUES(?)", (target,))
+        db.commit()
+        await q.edit_message_text("🚫 کاربر بن شد")
+        return
 
 # ---------------- HANDLE ----------------
 async def handle(update: Update, context):
@@ -215,7 +228,6 @@ async def handle(update: Update, context):
     uid = update.effective_user.id
     text = update.message.text
 
-
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
 
@@ -223,20 +235,19 @@ async def handle(update: Update, context):
             await update.message.reply_text("✍ /ban id | /unban id")
             return
 
-        if text and text.startswith("/ban"):
+        if text.startswith("/ban"):
             target = int(text.split()[1])
             cur.execute("INSERT OR IGNORE INTO banned(user_id) VALUES(?)", (target,))
             db.commit()
             await update.message.reply_text("🚫 بن شد")
             return
 
-        if text and text.startswith("/unban"):
+        if text.startswith("/unban"):
             target = int(text.split()[1])
             cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
             db.commit()
             await update.message.reply_text("✅ آنبن شد")
             return
-
 
         if text == "📊 گزارش پنل":
 
@@ -254,8 +265,7 @@ async def handle(update: Update, context):
 
             cur.execute("SELECT user_id FROM banned")
             banned_list = cur.fetchall()
-
-            banned_text = "\n".join([str(x[0]) for x in banned_list]) if banned_list else "ندارد"
+            banned_text = "\n".join([str(x[0]) for x in banned_list]) or "ندارد"
 
             await update.message.reply_text(
                 f"📊 گزارش سیستم\n\n"
@@ -267,12 +277,10 @@ async def handle(update: Update, context):
             )
             return
 
-
         if text == "📣 ارسال همگانی":
             broadcast_mode[uid] = True
             await update.message.reply_text("✍ متن یا عکس ارسال کنید")
             return
-
 
         if broadcast_mode.get(uid):
 
@@ -280,12 +288,12 @@ async def handle(update: Update, context):
             users = [r[0] for r in cur.fetchall()]
 
             photo = update.message.photo
-            caption = text
+            caption = update.message.caption or text or ""
 
             for u in users:
                 try:
                     if photo:
-                        await context.bot.send_photo(u, photo[-1].file_id, caption=caption or "")
+                        await context.bot.send_photo(u, photo[-1].file_id, caption=caption)
                     else:
                         await context.bot.send_message(u, f"📢 {caption}")
                 except:
@@ -294,7 +302,6 @@ async def handle(update: Update, context):
             broadcast_mode[uid] = False
             await update.message.reply_text("✅ ارسال شد")
             return
-
 
         if uid in reply_mode:
 
@@ -309,39 +316,44 @@ async def handle(update: Update, context):
             del reply_mode[uid]
             return
 
-
     # ---------------- USER ----------------
     if uid not in ADMIN_IDS:
 
+        if text == "👤 پروفایل من":
+            cur.execute("SELECT username, join_time, tickets_count FROM profiles WHERE user_id=?", (uid,))
+            row = cur.fetchone()
+
+            if row:
+                username, join_time, tickets = row
+
+                await update.message.reply_text(
+                    f"👤 پروفایل شما\n\n"
+                    f"🆔 ID: {uid}\n"
+                    f"👤 Username: @{username}\n"
+                    f"🎫 تیکت‌ها: {tickets}\n"
+                    f"📅 عضویت: {time.strftime('%Y-%m-%d', time.localtime(join_time))}"
+                )
+            return
+
         if text == "📜 قوانین":
             await update.message.reply_text(
-                "📜 قوانین سیستم پشتیبانی Kaletek\n\n"
-                "1️⃣ احترام الزامی است\n"
-                "2️⃣ هر تیکت یک موضوع مشخص\n"
-                "3️⃣ ارسال اسپم ممنوع\n"
-                "4️⃣ توضیحات کامل بنویسید\n"
-                "5️⃣ ارتباط مستقیم با ادمین ممنوع\n"
-                "6️⃣ زمان پاسخ‌گویی ممکن است متفاوت باشد\n"
-                "7️⃣ اطلاعات حساس ارسال نکنید\n\n"
-                "━━━━━━━━━━━━\n"
-                "💙 با استفاده از ربات قوانین را پذیرفته‌اید"
+                "📜 قوانین سیستم پشتیبانی\n\n"
+                "1️⃣ احترام\n2️⃣ اسپم ممنوع\n3️⃣ توضیح کامل\n4️⃣ اطلاعات حساس نفرستید"
             )
             return
 
-
         if text == "📞 تماس با پشتیبانی":
             await update.message.reply_text(
-                "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه پایین استفاده کنید.\n\n"
-                "‼️ لطفاً موضوع را در قالب یک پیام منسجم و واضح بنویسید؛ این کار باعث می‌شود پاسخگویی سریع‌تر انجام شود 💙\n\n"
-                "✅ با لمس دکمه زیر، گفتگو با تیم پشتیبانی آغاز می‌شود.",
+                "✍ پیام خود را ارسال کنید:",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
+                    [InlineKeyboardButton("✍ شروع", callback_data="start_ticket")]
                 ])
             )
             return
 
+        if text:
 
-        if ticket_mode.get(uid):
+            ticket_mode[uid] = True
 
             username = update.effective_user.username or "ندارد"
 
@@ -349,13 +361,16 @@ async def handle(update: Update, context):
             INSERT INTO tickets(user_id, username, message, status, created)
             VALUES (?, ?, ?, ?, ?)
             """, (uid, username, text, "open", int(time.time())))
-
             db.commit()
 
             tid = cur.lastrowid
 
-            for admin in ADMIN_IDS:
+            cur.execute("""
+            UPDATE profiles SET tickets_count = tickets_count + 1 WHERE user_id=?
+            """, (uid,))
+            db.commit()
 
+            for admin in ADMIN_IDS:
                 await context.bot.send_message(
                     admin,
                     f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {text}",
@@ -369,7 +384,6 @@ async def handle(update: Update, context):
             await update.message.reply_text("✅ تیکت ثبت شد")
             ticket_mode[uid] = False
             return
-
 
 # ---------------- RUN ----------------
 app = Application.builder().token(TOKEN).build()
