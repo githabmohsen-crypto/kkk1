@@ -82,7 +82,6 @@ async def is_member(context, user_id):
 
 # ---------------- ENFORCE ----------------
 async def enforce_channel(update, context):
-
     uid = update.effective_user.id
     save_user(update.effective_user)
 
@@ -117,7 +116,6 @@ def admin_menu():
 
 # ---------------- START ----------------
 async def start(update: Update, context):
-
     if not await enforce_channel(update, context):
         return
 
@@ -130,7 +128,6 @@ async def start(update: Update, context):
 
 # ---------------- CALLBACK ----------------
 async def callback(update: Update, context):
-
     q = update.callback_query
     await q.answer()
 
@@ -139,7 +136,12 @@ async def callback(update: Update, context):
 
     data = q.data
 
-    # CHECK
+    # BAN CHECK (FIX)
+    if is_banned(uid):
+        await q.message.reply_text("🚫 شما بن هستید")
+        return
+
+    # CHECK MEMBER
     if data == "check":
         if await is_member(context, uid):
             await context.bot.send_message(uid, "✅ عضویت تایید شد", reply_markup=user_menu())
@@ -164,15 +166,23 @@ async def callback(update: Update, context):
         cur.execute("INSERT OR IGNORE INTO banned(user_id) VALUES(?)", (target,))
         db.commit()
         await q.message.reply_text("🚫 بن شد")
+
+        try:
+            await context.bot.send_message(target, "🚫 شما توسط ادمین بن شدید")
+        except:
+            pass
         return
 
-    # CLOSE + RATING
+    # CLOSE
     if data.startswith("close_"):
-
         tid = int(data.split("_")[1])
 
         cur.execute("SELECT user_id FROM tickets WHERE id=?", (tid,))
-        user_id = cur.fetchone()[0]
+        row = cur.fetchone()
+        if not row:
+            return
+
+        user_id = row[0]
 
         cur.execute("UPDATE tickets SET status='closed' WHERE id=?", (tid,))
         db.commit()
@@ -191,9 +201,8 @@ async def callback(update: Update, context):
         )
         return
 
-    # RATING
+    # RATE
     if data.startswith("rate_"):
-
         _, tid, score = data.split("_")
 
         cur.execute("UPDATE tickets SET rating=? WHERE id=?", (int(score), tid))
@@ -204,7 +213,6 @@ async def callback(update: Update, context):
 
 # ---------------- HANDLE ----------------
 async def handle(update: Update, context):
-
     if not await enforce_channel(update, context):
         return
 
@@ -214,7 +222,6 @@ async def handle(update: Update, context):
 
     # ---------------- ADMIN REPLY ----------------
     if uid in ADMIN_IDS and uid in reply_state:
-
         target = reply_state[uid]
 
         await context.bot.send_message(
@@ -223,13 +230,11 @@ async def handle(update: Update, context):
         )
 
         await update.message.reply_text("✅ ارسال شد")
-
         del reply_state[uid]
         return
 
-    # ---------------- PROFILE (FIXED) ----------------
+    # ---------------- PROFILE ----------------
     if text == "👤 پروفایل":
-
         cur.execute("SELECT COUNT(*) FROM tickets WHERE user_id=?", (uid,))
         ticket_count = cur.fetchone()[0]
 
@@ -249,12 +254,11 @@ async def handle(update: Update, context):
         )
         return
 
-    # ---------------- ADMIN ----------------
+    # ---------------- ADMIN PANEL ----------------
     if uid in ADMIN_IDS:
 
-        # REPORT FIXED
+        # REPORT
         if text == "📊 گزارش پنل":
-
             cur.execute("SELECT COUNT(*) FROM users")
             users = cur.fetchone()[0]
 
@@ -282,9 +286,8 @@ async def handle(update: Update, context):
             )
             return
 
-        # OPEN TICKETS FIXED
+        # OPEN TICKETS
         if text == "📋 تیکت‌های باز":
-
             cur.execute("""
             SELECT id, user_id, username, message
             FROM tickets
@@ -299,7 +302,6 @@ async def handle(update: Update, context):
                 return
 
             for tid, user, username, msg in rows:
-
                 await update.message.reply_text(
                     f"""🎫 تیکت #{tid}
 
@@ -317,7 +319,28 @@ async def handle(update: Update, context):
                 )
             return
 
-    # ---------------- USER ----------------
+        # BROADCAST (FIX)
+        if text == "📣 ارسال همگانی":
+            broadcast_mode[uid] = True
+            await update.message.reply_text("✍ پیام همگانی را ارسال کنید:")
+            return
+
+    # ---------------- BROADCAST EXEC ----------------
+    if broadcast_mode.get(uid):
+        cur.execute("SELECT user_id FROM users")
+        users = cur.fetchall()
+
+        for u in users:
+            try:
+                await context.bot.send_message(u[0], text)
+            except:
+                pass
+
+        await update.message.reply_text("✅ پیام همگانی ارسال شد")
+        broadcast_mode[uid] = False
+        return
+
+    # ---------------- USER RULES ----------------
     if text == "📜 قوانین":
         await update.message.reply_text(
             "📜 قوانین سیستم پشتیبانی Kaletek\n\n"
@@ -336,8 +359,7 @@ async def handle(update: Update, context):
     if text == "📞 تماس با پشتیبانی":
         await update.message.reply_text(
             "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه پایین استفاده کنید.\n\n"
-            "‼️ لطفاً موضوع را در قالب یک پیام منسجم و واضح بنویسید 💙\n\n"
-            "✅ با لمس دکمه زیر، گفتگو با تیم پشتیبانی آغاز می‌شود.",
+            "‼️ لطفاً موضوع را واضح بنویسید 💙",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
             ])
@@ -346,7 +368,6 @@ async def handle(update: Update, context):
 
     # ---------------- TICKET ----------------
     if ticket_mode.get(uid):
-
         username = update.effective_user.username or "ندارد"
 
         cur.execute("""
@@ -355,6 +376,18 @@ async def handle(update: Update, context):
         """, (uid, username, text, "open", int(time.time())))
 
         db.commit()
+
+        ticket_id = cur.lastrowid
+
+        # SEND TO ADMINS (FIX)
+        for admin in ADMIN_IDS:
+            await context.bot.send_message(
+                admin,
+                f"🎫 تیکت جدید #{ticket_id}\n\n"
+                f"👤 کاربر: @{username}\n"
+                f"🆔 ID: {uid}\n\n"
+                f"📝 پیام:\n{text}"
+            )
 
         await update.message.reply_text("✅ تیکت ثبت شد")
         ticket_mode[uid] = False
@@ -365,6 +398,6 @@ app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
 app.add_handler(CallbackQueryHandler(callback))
-app.add_handler(MessageHandler(filters.ALL, handle))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
 
 app.run_polling()
