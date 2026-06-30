@@ -435,6 +435,37 @@ async def handle(update: Update, context):
         return
 
     if ticket_mode.get(uid):
+
+        cur.execute(
+        "SELECT ticket_id FROM active_tickets WHERE user_id=?",
+        (uid,)
+        )
+
+        row = cur.fetchone()
+        if row:
+            tid = row[0]
+        else:
+            username = update.effective_user.username or "ندارد"
+        
+            cur.execute("""
+            INSERT INTO tickets(user_id, username, message, status, created)
+            VALUES (?,?,?,?,?)
+            """, (
+                uid,
+                username,
+                "",
+                "open",
+                int(time.time())
+            ))
+        
+            tid = cur.lastrowid
+        
+            cur.execute("""
+            INSERT OR REPLACE INTO active_tickets(user_id, ticket_id)
+            VALUES(?,?)
+            """, (uid, tid))
+        
+            db.commit()
     
         username = update.effective_user.username or "ندارد"
     
