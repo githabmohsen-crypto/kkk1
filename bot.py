@@ -471,7 +471,16 @@ async def handle(update: Update, context):
                     reply_markup=keyboard
                 )
     
-        await update.message.reply_text("✅ تیکت ثبت شد")
+        await update.message.reply_text("تیکت شما به واحد پشتیبانی ارسال شد ✅️
+
+            1️⃣ درخواست شما در صف بررسی تیم پشتیبانی قرار گرفت و در اولین فرصت پاسخ داده خواهد شد.
+            
+            2️⃣ لطفاً از ارسال پیام‌های تکراری یا اسپم خودداری کنید تا روند رسیدگی سریع‌تر انجام شود.
+            
+            3️⃣ زمان پاسخ‌دهی ممکن است بسته به حجم درخواست‌ها متفاوت باشد.
+            
+            💙 از صبوری و همراهی شما سپاسگزاریم.")
+            
         ticket_mode[uid] = False
         return
 async def unban_cmd(update: Update, context):
