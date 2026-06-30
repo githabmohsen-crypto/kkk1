@@ -174,25 +174,28 @@ async def callback(update: Update, context):
     
         tid = int(q.data.split("_")[1])
     
-        cur.execute("SELECT user_id FROM tickets WHERE id=?", (tid,))
+        cur.execute(
+            "SELECT user_id FROM tickets WHERE id=?",
+            (tid,)
+        )
+    
         row = cur.fetchone()
     
         if not row:
-            await q.answer("تیکت پیدا نشد", show_alert=True)
+            await q.answer("تیکت پیدا نشد")
             return
     
         user_id = row[0]
     
-        cur.execute("UPDATE tickets SET status='closed' WHERE id=?", (tid,))
+        cur.execute(
+            "UPDATE tickets SET status='closed' WHERE id=?",
+            (tid,)
+        )
+    
         db.commit()
     
         await q.edit_message_text("✔ بسته شد")
     
-        await context.bot.send_message(
-            user_id,
-            "🙏 تیکت شما بسته شد"
-        )
-
         await context.bot.send_message(
             user_id,
             "🙏 تیکت شما بسته شد\n\n⭐ لطفاً میزان رضایت خود را ثبت کنید:",
@@ -203,6 +206,7 @@ async def callback(update: Update, context):
                 [InlineKeyboardButton("😠 ضعیف", callback_data=f"rate_{tid}_1")]
             ])
         )
+    
         return
 
     if q.data.startswith("rate_"):
@@ -291,19 +295,26 @@ async def handle(update: Update, context):
 
         # ---------------- FIX 2: MEDIA NOT NONE ----------------
         if broadcast_mode.get(uid):
-
+        
             cur.execute("SELECT DISTINCT user_id FROM users")
             users = [r[0] for r in cur.fetchall()]
-
+        
             for u in users:
                 try:
                     if photo:
-                        await context.bot.send_photo(u, photo[-1].file_id, caption=caption or "")
+                        await context.bot.send_photo(
+                            u,
+                            photo[-1].file_id,
+                            caption=caption or ""
+                        )
                     else:
-                        await context.bot.send_message(u, f"📢 {text or caption}")
+                        await context.bot.send_message(
+                            u,
+                            f"📢 {text or caption}"
+                        )
                 except:
                     pass
-
+        
             broadcast_mode[uid] = False
             await update.message.reply_text("✅ ارسال شد")
             return
@@ -313,16 +324,7 @@ async def handle(update: Update, context):
             target = reply_mode[uid]
 
             if photo:
-                await context.bot.send_photo(
-                    admin,
-                    photo=photo[-1].file_id,
-                    caption=f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {caption or ''}",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-                        [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-                        [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
-                    ])
-                )
+                await context.bot.send_photo(target, photo[-1].file_id, caption=caption or "")
             else:
                 await context.bot.send_message(target, f"📩 پاسخ پشتیبانی:\n\n{text}")
 
@@ -375,42 +377,45 @@ async def handle(update: Update, context):
         return
 
     if ticket_mode.get(uid):
-    
+
         username = update.effective_user.username or "ندارد"
-    
+
         cur.execute("""
         INSERT INTO tickets(user_id, username, message, status, created)
         VALUES (?, ?, ?, ?, ?)
-        """, (uid, username, text or caption, "open", int(time.time())))
+        """, (uid, username, text, "open", int(time.time())))
         db.commit()
-    
+
         tid = cur.lastrowid
-    
+
         cur.execute("UPDATE profiles SET tickets_count = tickets_count + 1 WHERE user_id=?", (uid,))
         db.commit()
-    
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+            [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+            [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+        ])
+        
         for admin in ADMIN_IDS:
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-                    [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]    
+        
             if photo:
-            
-            await context.bot.send_photo(
-                admin,
-                photo[-1].file_id,
-                caption=f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {caption or ''}",
-                reply_markup=keyboard
-            )
-                )/*************************
+        
+                await context.bot.send_photo(
+                    admin,
+                    photo[-1].file_id,
+                    caption=f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {caption or ''}",
+                    reply_markup=keyboard
+                )
+        
             else:
-            ])
-            await context.bot.send_message(
-                admin,
-                f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {text}",
-                reply_markup=keyboard
-            )
-    
+        
+                await context.bot.send_message(
+                    admin,
+                    f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {text}",
+                    reply_markup=keyboard
+                )
+
         await update.message.reply_text("✅ تیکت ثبت شد")
         ticket_mode[uid] = False
         return
