@@ -101,7 +101,7 @@ async def start(update: Update, context):
     if uid in ADMIN_IDS:
         await update.message.reply_text("🛠 پنل ادمین", reply_markup=admin_menu())
     else:
-        await update.message.reply_text("👋 خوش آمدید", reply_markup=user_menu())
+        await update.message.reply_text("👋 Kaletek Support خوش آمدید به ربات", reply_markup=user_menu())
 
 
 # ---------------- CALLBACK ----------------
