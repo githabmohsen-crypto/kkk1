@@ -1,7 +1,15 @@
+```python
 import os
-import sqlite3
 import time
-from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
+import sqlite3
+
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
+
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -11,175 +19,381 @@ from telegram.ext import (
     filters,
 )
 
-# ---------------- CONFIG ----------------
-TOKEN = os.environ.get("BOT_TOKEN")
+# ================= CONFIG =================
+
+TOKEN = os.getenv("BOT_TOKEN")
+
 CHANNEL = "@Kaletek_news"
 ADMIN_IDS = [8815017184]
 
-# ---------------- DB ----------------
-conn = sqlite3.connect("tickets.db", check_same_thread=False)
-cur = conn.cursor()
+# ================= DATABASE =================
+
+db = sqlite3.connect(
+    "tickets.db",
+    check_same_thread=False
+)
+
+cur = db.cursor()
 
 cur.execute("""
-CREATE TABLE IF NOT EXISTS tickets (
+CREATE TABLE IF NOT EXISTS tickets(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
     username TEXT,
     message TEXT,
     status TEXT,
-    time INTEGER
+    created INTEGER
 )
 """)
-conn.commit()
 
-user_state = {}
-reply_to_user = {}
+db.commit()
 
-# ---------------- CHECK CHANNEL MEMBERSHIP ----------------
-async def is_member(context, user_id: int) -> bool:
+# ================= MEMORY =================
+
+ticket_mode = {}
+reply_mode = {}
+
+# ================= UTILITIES =================
+
+async def is_member(context, user_id):
     try:
-        member = await context.bot.get_chat_member(CHANNEL, user_id)
-        return member.status in ["member", "administrator", "creator"]
-    except:
+        member = await context.bot.get_chat_member(
+            CHANNEL,
+            user_id
+        )
+
+        return member.status in (
+            "member",
+            "administrator",
+            "creator"
+        )
+
+    except Exception:
         return False
 
-# ---------------- KEYBOARDS ----------------
-def user_menu():
+
+def get_user_menu():
     return ReplyKeyboardMarkup(
-        [["📩 ارسال تیکت"], ["📜 قوانین", "📞 ارتباط"]],
+        [
+            ["📩 ارسال تیکت"],
+            ["📜 قوانین", "📞 ارتباط"],
+        ],
         resize_keyboard=True
     )
 
-def admin_menu():
+
+def get_admin_menu():
     return ReplyKeyboardMarkup(
-        [["📋 تیکت‌های باز"]],
+        [
+            ["📋 تیکت‌های باز"]
+        ],
         resize_keyboard=True
     )
 
-# ---------------- START ----------------
+# ================= START =================
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    uid = update.effective_user.id
 
-    if not await is_member(context, uid):
+    user_id = update.effective_user.id
+
+    if not await is_member(context, user_id):
+
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton(
+                    "📢 عضویت",
+                    url="https://t.me/Kaletek_news"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "✅ عضو شدم",
+                    callback_data="verify"
+                )
+            ]
+        ])
+
         await update.message.reply_text(
-            "🚀 برای استفاده باید عضو کانال باشی:",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("📢 عضویت", url="https://t.me/Kaletek_news")],
-                [InlineKeyboardButton("✅ عضو شدم", callback_data="check")]
-            ])
+            "برای استفاده ابتدا عضو کانال شوید.",
+            reply_markup=keyboard
         )
+
         return
 
-    if uid in ADMIN_IDS:
-        await update.message.reply_text("🛠 پنل ادمین", reply_markup=admin_menu())
-    else:
-        await update.message.reply_text("👋 خوش آمدی", reply_markup=user_menu())
+    if user_id in ADMIN_IDS:
 
-# ---------------- CALLBACK ----------------
-async def callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        text = "🛠 پنل مدیریت"
+        menu = get_admin_menu()
+
+    else:
+
+        text = "👋 خوش آمدید"
+        menu = get_user_menu()
+
+    await update.message.reply_text(
+        text,
+        reply_markup=menu
+    )
+
+# ================= CALLBACK =================
+
+async def callback(update: Update, context):
+
     query = update.callback_query
+
     await query.answer()
 
-    uid = query.from_user.id
+    user_id = query.from_user.id
 
-    # membership check
-    if query.data == "check":
-        if await is_member(context, uid):
-            await query.message.reply_text("✅ تایید شد")
-            await context.bot.send_message(uid, "👋 وارد شدی", reply_markup=user_menu())
+    if query.data == "verify":
+
+        if await is_member(context, user_id):
+
+            await context.bot.send_message(
+                chat_id=user_id,
+                text="✅ عضویت تایید شد",
+                reply_markup=get_user_menu()
+            )
+
         else:
-            await query.message.reply_text("❌ هنوز عضو نشدی")
 
-    # admin reply setup
-    elif query.data.startswith("reply_"):
-        target = int(query.data.split("_")[1])
-        reply_to_user[uid] = target
-        await query.message.reply_text("✉ حالا پیام پاسخ را بنویس:")
+            await query.message.reply_text(
+                "❌ هنوز عضو کانال نیستید"
+            )
 
-    # close ticket
-    elif query.data.startswith("close_"):
-        tid = int(query.data.split("_")[1])
-        cur.execute("UPDATE tickets SET status='closed' WHERE id=?", (tid,))
-        conn.commit()
-        await query.edit_message_text("✔ تیکت بسته شد")
+        return
 
-# ---------------- MESSAGE HANDLER ----------------
-async def handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    uid = user.id
+    if query.data.startswith("reply_"):
+
+        target = int(
+            query.data.split("_")[1]
+        )
+
+        reply_mode[user_id] = target
+
+        await query.message.reply_text(
+            "✍ متن پاسخ را ارسال کنید"
+        )
+
+        return
+
+    if query.data.startswith("close_"):
+
+        ticket_id = int(
+            query.data.split("_")[1]
+        )
+
+        cur.execute(
+            """
+            UPDATE tickets
+            SET status='closed'
+            WHERE id=?
+            """,
+            (ticket_id,)
+        )
+
+        db.commit()
+
+        await query.edit_message_text(
+            "✔ تیکت بسته شد"
+        )
+
+# ================= HANDLE MESSAGE =================
+
+async def handle(update: Update, context):
+
+    user_id = update.effective_user.id
+    username = update.effective_user.username
     text = update.message.text
 
-    # ---------------- USER ----------------
-    if uid not in ADMIN_IDS:
+    # ---------- ADMIN REPLY ----------
+
+    if user_id in ADMIN_IDS and user_id in reply_mode:
+
+        target = reply_mode.pop(user_id)
+
+        await context.bot.send_message(
+            target,
+            f"📩 پاسخ پشتیبانی:\n\n{text}"
+        )
+
+        await update.message.reply_text(
+            "✅ پاسخ ارسال شد"
+        )
+
+        return
+
+    # ---------- USER ----------
+
+    if user_id not in ADMIN_IDS:
 
         if text == "📜 قوانین":
-            await update.message.reply_text("📜 احترام الزامی است")
+
+            await update.message.reply_text(
+                "احترام و رعایت قوانین الزامی است."
+            )
+
             return
 
         if text == "📞 ارتباط":
-            await update.message.reply_text("📞 از سیستم تیکت استفاده کنید")
+
+            await update.message.reply_text(
+                "برای ارتباط از بخش تیکت استفاده کنید."
+            )
+
             return
 
         if text == "📩 ارسال تیکت":
-            user_state[uid] = True
-            await update.message.reply_text("✍ پیام خود را ارسال کنید:")
+
+            ticket_mode[user_id] = True
+
+            await update.message.reply_text(
+                "پیام خود را ارسال کنید."
+            )
+
             return
 
-        if user_state.get(uid):
+        if ticket_mode.get(user_id):
+
             cur.execute("""
-                INSERT INTO tickets (user_id, username, message, status, time)
-                VALUES (?, ?, ?, 'open', ?)
-            """, (uid, user.username, text, int(time.time())))
-            conn.commit()
+            INSERT INTO tickets
+            (
+                user_id,
+                username,
+                message,
+                status,
+                created
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """, (
+                user_id,
+                username,
+                text,
+                "open",
+                int(time.time())
+            ))
 
-            user_state[uid] = False
-            await update.message.reply_text("✅ تیکت ثبت شد")
-            return
+            db.commit()
 
-    # ---------------- ADMIN ----------------
-    if uid in ADMIN_IDS:
+            ticket_id = cur.lastrowid
 
-        if text == "📋 تیکت‌های باز":
-            cur.execute("SELECT id, user_id, message FROM tickets WHERE status='open'")
-            tickets = cur.fetchall()
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton(
+                        "✉ پاسخ",
+                        callback_data=f"reply_{user_id}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        "✔ بستن",
+                        callback_data=f"close_{ticket_id}"
+                    )
+                ]
+            ])
 
-            if not tickets:
-                await update.message.reply_text("📭 تیکتی نیست")
-                return
+            for admin in ADMIN_IDS:
 
-            for tid, user_id, msg in tickets:
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{user_id}")],
-                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")]
-                ])
-
-                await update.message.reply_text(
-                    f"🎫 #{tid}\n👤 {user_id}\n📝 {msg}",
+                await context.bot.send_message(
+                    admin,
+                    (
+                        f"🎫 تیکت #{ticket_id}\n\n"
+                        f"👤 {user_id}\n"
+                        f"📝 {text}"
+                    ),
                     reply_markup=keyboard
                 )
 
-# ---------------- ADMIN REPLY ----------------
-async def admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    uid = update.effective_user.id
+            ticket_mode[user_id] = False
 
-    if uid in ADMIN_IDS and uid in reply_to_user:
-        target = reply_to_user[uid]
+            await update.message.reply_text(
+                "✅ تیکت ثبت شد"
+            )
 
-        await context.bot.send_message(
-            chat_id=target,
-            text=f"📩 پاسخ پشتیبانی:\n\n{update.message.text}"
+            return
+
+    # ---------- ADMIN PANEL ----------
+
+    if user_id in ADMIN_IDS:
+
+        if text == "📋 تیکت‌های باز":
+
+            cur.execute("""
+            SELECT id, user_id, message
+            FROM tickets
+            WHERE status='open'
+            """)
+
+            rows = cur.fetchall()
+
+            if not rows:
+
+                await update.message.reply_text(
+                    "تیکت بازی وجود ندارد."
+                )
+
+                return
+
+            for tid, user, msg in rows:
+
+                keyboard = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton(
+                            "✉ پاسخ",
+                            callback_data=f"reply_{user}"
+                        )
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "✔ بستن",
+                            callback_data=f"close_{tid}"
+                        )
+                    ]
+                ])
+
+                await update.message.reply_text(
+                    (
+                        f"🎫 #{tid}\n"
+                        f"👤 {user}\n"
+                        f"📝 {msg}"
+                    ),
+                    reply_markup=keyboard
+                )
+
+# ================= RUN =================
+
+def main():
+
+    app = (
+        Application
+        .builder()
+        .token(TOKEN)
+        .build()
+    )
+
+    app.add_handler(
+        CommandHandler(
+            "start",
+            start
         )
+    )
 
-        await update.message.reply_text("✅ ارسال شد")
-        del reply_to_user[uid]
+    app.add_handler(
+        CallbackQueryHandler(
+            callback
+        )
+    )
 
-# ---------------- APP ----------------
-app = Application.builder().token(TOKEN).build()
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            handle
+        )
+    )
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CallbackQueryHandler(callback))
+    app.run_polling()
 
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, admin_reply))
 
-app.run_polling()
+if __name__ == "__main__":
+    main()
+```
