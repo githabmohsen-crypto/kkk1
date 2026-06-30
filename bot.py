@@ -244,28 +244,6 @@ async def callback(update: Update, context):
         await q.answer("کاربر بن شد")
     
         return
-    if q.data.startswith("unban_"):
-    
-        target = int(q.data.split("_")[1])
-    
-        cur.execute(
-            "DELETE FROM banned WHERE user_id=?",
-            (target,)
-        )
-    
-        db.commit()
-    
-        try:
-            await context.bot.send_message(
-                target,
-                "✅ محدودیت شما برداشته شد"
-            )
-        except:
-            pass
-    
-        await q.answer("رفع بن انجام شد")
-    
-        return
 
 # ---------------- HANDLE ----------------
 async def handle(update: Update, context):
@@ -286,6 +264,29 @@ async def handle(update: Update, context):
             broadcast_mode[uid] = True
             await update.message.reply_text("✍ پیام همگانی را ارسال کنید")
             return
+        if text == "🚫 مدیریت بن":
+            cur.execute("SELECT user_id FROM banned")
+            rows = cur.fetchall()
+        
+            if not rows:
+                await update.message.reply_text("لیست بن خالی است")
+                return
+        
+            banned_list = "\n".join([str(r[0]) for r in rows])
+        
+            await update.message.reply_text(
+                f"🚫 کاربران بن شده:\n\n{banned_list}"
+            )
+            return
+            if q.data.startswith("unban_"):
+                target = int(q.data.split("_")[1])
+            
+                cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
+                db.commit()
+            
+                await q.answer("رفع بن شد")
+                await q.edit_message_text("✅ کاربر از بن خارج شد")
+                return
 
         # FIX 1: REPORT ALWAYS WORKS
         if text == "📊 گزارش پنل":
@@ -333,7 +334,6 @@ async def handle(update: Update, context):
                         [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid2}")],
                         [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
                         [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid2}")]
-                        [InlineKeyboardButton("✅ رفع بن", callback_data=f"unban_{uid2}")]
                     ])
                 )
             return
@@ -440,6 +440,7 @@ async def handle(update: Update, context):
             [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
             [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
             [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+            [InlineKeyboardButton("✅ رفع بن", callback_data=f"unban_{uid2}")]
         ])
         
         for admin in ADMIN_IDS:
