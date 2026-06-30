@@ -19,9 +19,6 @@ from telegram.ext import (
 
 # ---------------- CONFIG ----------------
 TOKEN = os.environ.get("BOT_TOKEN")
-if not TOKEN:
-    raise RuntimeError("BOT_TOKEN is not set!")
-
 CHANNEL = "@Kaletek_news"
 ADMIN_IDS = [8815017184]
 
@@ -90,7 +87,6 @@ async def enforce_channel(update, context):
     cur.execute("INSERT OR IGNORE INTO users(user_id) VALUES(?)", (uid,))
     db.commit()
 
-    # create profile
     cur.execute("""
     INSERT OR IGNORE INTO profiles(user_id, username, join_time, tickets_count)
     VALUES (?, ?, ?, 0)
@@ -117,10 +113,10 @@ async def enforce_channel(update, context):
 
     return True
 
-# ---------------- MENUS ----------------
+# ---------------- MENUS (NO TEXT CHANGE) ----------------
 def user_menu():
     return ReplyKeyboardMarkup(
-        [["👤 پروفایل من"], ["📞 تماس با پشتیبانی"], ["📜 قوانین"]],
+        [["📞 تماس با پشتیبانی"], ["📜 قوانین"]],
         resize_keyboard=True
     )
 
@@ -165,14 +161,20 @@ async def callback(update: Update, context):
             )
         return
 
-    # reply start
+    # FIX: START TICKET MODE (MISSING BEFORE)
+    if q.data == "start_ticket":
+        ticket_mode[uid] = True
+        await q.message.reply_text("✍ پیام خود را ارسال کنید")
+        return
+
+    # REPLY FIX
     if q.data.startswith("reply_"):
         target = int(q.data.split("_")[1])
         reply_mode[uid] = target
         await q.message.reply_text("✉ پاسخ را بنویس")
         return
 
-    # close ticket
+    # CLOSE FIX
     if q.data.startswith("close_"):
 
         tid = int(q.data.split("_")[1])
@@ -201,7 +203,15 @@ async def callback(update: Update, context):
         )
         return
 
-    # rating
+    # BAN FIX
+    if q.data.startswith("ban_"):
+        target = int(q.data.split("_")[1])
+        cur.execute("INSERT OR IGNORE INTO banned(user_id) VALUES(?)", (target,))
+        db.commit()
+        await q.edit_message_text("🚫 کاربر بن شد")
+        return
+
+    # RATE
     if q.data.startswith("rate_"):
         _, tid, score = q.data.split("_")
 
@@ -209,14 +219,6 @@ async def callback(update: Update, context):
         db.commit()
 
         await q.message.edit_text("🙏 ممنون از ثبت نظر شما 💙")
-        return
-
-    # ban
-    if q.data.startswith("ban_"):
-        target = int(q.data.split("_")[1])
-        cur.execute("INSERT OR IGNORE INTO banned(user_id) VALUES(?)", (target,))
-        db.commit()
-        await q.edit_message_text("🚫 کاربر بن شد")
         return
 
 # ---------------- HANDLE ----------------
@@ -247,6 +249,28 @@ async def handle(update: Update, context):
             cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
             db.commit()
             await update.message.reply_text("✅ آنبن شد")
+            return
+
+        # FIX: OPEN TICKETS LIST (WAS MISSING)
+        if text == "📋 تیکت‌های باز":
+
+            cur.execute("SELECT id, user_id, username, message FROM tickets WHERE status='open'")
+            rows = cur.fetchall()
+
+            if not rows:
+                await update.message.reply_text("🎉 هیچ تیکت بازی وجود ندارد")
+                return
+
+            for tid, uid2, username, message in rows:
+
+                await update.message.reply_text(
+                    f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid2}\n\n📝 {message}",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid2}")],
+                        [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                        [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid2}")]
+                    ])
+                )
             return
 
         if text == "📊 گزارش پنل":
@@ -319,41 +343,34 @@ async def handle(update: Update, context):
     # ---------------- USER ----------------
     if uid not in ADMIN_IDS:
 
-        if text == "👤 پروفایل من":
-            cur.execute("SELECT username, join_time, tickets_count FROM profiles WHERE user_id=?", (uid,))
-            row = cur.fetchone()
-
-            if row:
-                username, join_time, tickets = row
-
-                await update.message.reply_text(
-                    f"👤 پروفایل شما\n\n"
-                    f"🆔 ID: {uid}\n"
-                    f"👤 Username: @{username}\n"
-                    f"🎫 تیکت‌ها: {tickets}\n"
-                    f"📅 عضویت: {time.strftime('%Y-%m-%d', time.localtime(join_time))}"
-                )
-            return
-
         if text == "📜 قوانین":
             await update.message.reply_text(
-                "📜 قوانین سیستم پشتیبانی\n\n"
-                "1️⃣ احترام\n2️⃣ اسپم ممنوع\n3️⃣ توضیح کامل\n4️⃣ اطلاعات حساس نفرستید"
+                "📜 قوانین سیستم پشتیبانی Kaletek\n\n"
+                "1️⃣ احترام الزامی است\n"
+                "2️⃣ هر تیکت یک موضوع مشخص\n"
+                "3️⃣ ارسال اسپم ممنوع\n"
+                "4️⃣ توضیحات کامل بنویسید\n"
+                "5️⃣ ارتباط مستقیم با ادمین ممنوع\n"
+                "6️⃣ زمان پاسخ‌گویی ممکن است متفاوت باشد\n"
+                "7️⃣ اطلاعات حساس ارسال نکنید\n\n"
+                "━━━━━━━━━━━━\n"
+                "💙 با استفاده از ربات قوانین را پذیرفته‌اید"
             )
             return
 
         if text == "📞 تماس با پشتیبانی":
             await update.message.reply_text(
-                "✍ پیام خود را ارسال کنید:",
+                "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه پایین استفاده کنید.\n\n"
+                "‼️ لطفاً موضوع را در قالب یک پیام منسجم و واضح بنویسید؛ این کار باعث می‌شود پاسخگویی سریع‌تر انجام شود 💙\n\n"
+                "✅ با لمس دکمه زیر، گفتگو با تیم پشتیبانی آغاز می‌شود.",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✍ شروع", callback_data="start_ticket")]
+                    [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
                 ])
             )
             return
 
-        if text:
-
-            ticket_mode[uid] = True
+        # FIX: ONLY SEND TICKET WHEN MODE ACTIVE
+        if ticket_mode.get(uid):
 
             username = update.effective_user.username or "ندارد"
 
