@@ -227,6 +227,11 @@ async def handle(update: Update, context):
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
 
+        if text == "📣 ارسال همگانی":
+            broadcast_mode[uid] = True
+            await update.message.reply_text("✍ پیام همگانی را ارسال کنید")
+            return
+
         # FIX 1: REPORT ALWAYS WORKS
         if text == "📊 گزارش پنل":
 
