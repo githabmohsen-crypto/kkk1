@@ -287,6 +287,24 @@ async def handle(update: Update, context):
                 await q.answer("رفع بن شد")
                 await q.edit_message_text("✅ کاربر از بن خارج شد")
                 return
+     async def unban_cmd(update: Update, context):
+
+        uid = update.effective_user.id
+    
+        if uid not in ADMIN_IDS:
+            await update.message.reply_text("⛔ دسترسی ندارید")
+            return
+    
+        if len(context.args) == 0:
+            await update.message.reply_text("❌ مثال: /unban 123456")
+            return
+    
+        target = int(context.args[0])
+    
+        cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
+        db.commit()
+    
+        await update.message.reply_text(f"✅ کاربر {target} از بن خارج شد")
 
         # FIX 1: REPORT ALWAYS WORKS
         if text == "📊 گزارش پنل":
@@ -463,7 +481,7 @@ async def handle(update: Update, context):
         ticket_mode[uid] = False
         return
 # ---------------- RUN ----------------
-
+app.add_handler(CommandHandler("unban", unban_cmd))
 app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
