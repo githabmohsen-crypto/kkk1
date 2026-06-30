@@ -14,7 +14,6 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
-    ContextTypes,
     filters
 )
 
@@ -44,7 +43,7 @@ ticket_mode = {}
 reply_mode = {}
 
 
-# ---------------- CHECK MEMBERSHIP ----------------
+# ---------------- CHECK MEMBER ----------------
 async def is_member(context, user_id):
     try:
         m = await context.bot.get_chat_member(CHANNEL, user_id)
@@ -112,7 +111,7 @@ async def callback(update: Update, context):
 
     uid = q.from_user.id
 
-    # ---------------- CHECK ----------------
+    # -------- CHECK --------
     if q.data == "check":
 
         if await is_member(context, uid):
@@ -136,7 +135,7 @@ async def callback(update: Update, context):
         return
 
 
-    # ---------------- START TICKET ----------------
+    # -------- START TICKET --------
     if q.data == "start_ticket":
 
         ticket_mode[uid] = True
@@ -146,7 +145,7 @@ async def callback(update: Update, context):
         return
 
 
-    # ---------------- REPLY ----------------
+    # -------- REPLY --------
     if q.data.startswith("reply_"):
 
         target = int(q.data.split("_")[1])
@@ -158,7 +157,7 @@ async def callback(update: Update, context):
         return
 
 
-    # ---------------- CLOSE ----------------
+    # -------- CLOSE --------
     if q.data.startswith("close_"):
 
         tid = int(q.data.split("_")[1])
@@ -184,7 +183,7 @@ async def handle(update: Update, context):
     text = update.message.text
 
 
-    # ---------------- ADMIN REPLY ----------------
+    # -------- ADMIN REPLY --------
     if uid in ADMIN_IDS and uid in reply_mode:
 
         target = reply_mode[uid]
@@ -200,7 +199,7 @@ async def handle(update: Update, context):
         return
 
 
-    # ---------------- USER ----------------
+    # -------- USER --------
     if uid not in ADMIN_IDS:
 
 
@@ -236,7 +235,7 @@ async def handle(update: Update, context):
             return
 
 
-        # ================= TICKET MODE (FIX MEDIA) =================
+        # ================= TICKET MODE (MEDIA FIX) =================
         if ticket_mode.get(uid):
 
             message_type = "text"
@@ -273,7 +272,7 @@ async def handle(update: Update, context):
 
             for admin in ADMIN_IDS:
 
-                base_caption = f"🎫 تیکت #{tid}\n👤 {uid}\n\n📝 {caption}"
+                caption_text = f"🎫 تیکت #{tid}\n👤 {uid}\n\n📝 {caption}"
 
                 keyboard = InlineKeyboardMarkup([
                     [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
@@ -283,45 +282,45 @@ async def handle(update: Update, context):
                 if message_type == "photo":
 
                     await context.bot.send_photo(
-                        admin,
-                        file_id,
-                        caption=base_caption,
+                        chat_id=admin,
+                        photo=file_id,
+                        caption=caption_text,
                         reply_markup=keyboard
                     )
 
                 elif message_type == "video":
 
                     await context.bot.send_video(
-                        admin,
-                        file_id,
-                        caption=base_caption,
+                        chat_id=admin,
+                        video=file_id,
+                        caption=caption_text,
                         reply_markup=keyboard
                     )
 
                 elif message_type == "document":
 
                     await context.bot.send_document(
-                        admin,
-                        file_id,
-                        caption=base_caption,
+                        chat_id=admin,
+                        document=file_id,
+                        caption=caption_text,
                         reply_markup=keyboard
                     )
 
                 else:
 
                     await context.bot.send_message(
-                        admin,
-                        base_caption,
+                        chat_id=admin,
+                        text=caption_text,
                         reply_markup=keyboard
                     )
 
-            await update.message.reply_text(f"✅ تیکت #{tid} ثبت شد")
+            await update.message.reply_text(f"✅ تیکت ثبت شد")
 
             ticket_mode[uid] = False
             return
 
 
-    # ---------------- ADMIN PANEL ----------------
+    # -------- ADMIN PANEL --------
     if uid in ADMIN_IDS:
 
         if text == "📋 تیکت‌های باز":
