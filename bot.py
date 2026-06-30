@@ -39,9 +39,8 @@ created INTEGER
 """)
 db.commit()
 
-# حرفه‌ای‌تر: مدیریت تیکت فعال ادمین‌ها
-admin_reply_ticket = {}   # admin_id -> ticket_id
-user_ticket_mode = {}     # user_id -> bool
+ticket_mode = {}
+reply_mode = {}
 
 
 # ---------------- CHECK MEMBER ----------------
@@ -105,7 +104,7 @@ async def start(update: Update, context):
 
 
 # ---------------- CALLBACK ----------------
-async def callback(update: Update, context):
+async def callback(update, context):
 
     q = update.callback_query
     await q.answer()
@@ -139,26 +138,22 @@ async def callback(update: Update, context):
     # -------- START TICKET --------
     if q.data == "start_ticket":
 
-        user_ticket_mode[uid] = True
-
+        ticket_mode[uid] = True
         await q.message.reply_text("✍ پیام خود را ارسال کنید")
-
         return
 
 
-    # -------- ADMIN REPLY SELECT TICKET --------
+    # -------- REPLY --------
     if q.data.startswith("reply_"):
 
-        tid = int(q.data.split("_")[1])
-
-        admin_reply_ticket[uid] = tid
+        target = int(q.data.split("_")[1])
+        reply_mode[uid] = target
 
         await q.message.reply_text("✉ پاسخ را بنویس")
-
         return
 
 
-    # -------- CLOSE TICKET --------
+    # -------- CLOSE --------
     if q.data.startswith("close_"):
 
         tid = int(q.data.split("_")[1])
@@ -167,12 +162,11 @@ async def callback(update: Update, context):
         db.commit()
 
         await q.edit_message_text("✔ بسته شد")
-
         return
 
 
 # ---------------- HANDLE ----------------
-async def handle(update: Update, context):
+async def handle(update, context):
 
     if not await enforce_channel(update, context):
         return
@@ -181,65 +175,27 @@ async def handle(update: Update, context):
     text = update.message.text
 
 
-    # ================= ADMIN REPLY (PRO FIX) =================
-    if uid in ADMIN_IDS and uid in admin_reply_ticket:
+    # -------- ADMIN REPLY --------
+    if uid in ADMIN_IDS and uid in reply_mode:
 
-        tid = admin_reply_ticket[uid]
+        target = reply_mode[uid]
 
-        cur.execute("SELECT user_id FROM tickets WHERE id=?", (tid,))
-        row = cur.fetchone()
-
-        if not row:
-            await update.message.reply_text("❌ تیکت پیدا نشد")
-            return
-
-        target = row[0]
-
-        caption = "📩 پاسخ پشتیبانی"
-
-        # --- MEDIA SUPPORT ---
-        if update.message.photo:
-
-            await context.bot.send_photo(
-                chat_id=target,
-                photo=update.message.photo[-1].file_id,
-                caption=caption
-            )
-
-        elif update.message.video:
-
-            await context.bot.send_video(
-                chat_id=target,
-                video=update.message.video.file_id,
-                caption=caption
-            )
-
-        elif update.message.document:
-
-            await context.bot.send_document(
-                chat_id=target,
-                document=update.message.document.file_id,
-                caption=caption
-            )
-
-        else:
-
-            await context.bot.send_message(
-                chat_id=target,
-                text=f"{caption}\n\n{text}"
-            )
+        await context.bot.send_message(
+            target,
+            f"📩 پاسخ پشتیبانی:\n\n{text}"
+        )
 
         await update.message.reply_text("✅ ارسال شد")
 
-        del admin_reply_ticket[uid]
+        del reply_mode[uid]
         return
 
 
-    # ================= USER =================
+    # -------- USER --------
     if uid not in ADMIN_IDS:
 
 
-        # -------- RULES --------
+        # ================= RULES (بدون تغییر متن) =================
         if text == "📜 قوانین":
 
             await update.message.reply_text(
@@ -257,13 +213,13 @@ async def handle(update: Update, context):
             return
 
 
-        # -------- CONTACT --------
+        # ================= CONTACT (بدون تغییر متن) =================
         if text == "📞 تماس با پشتیبانی":
 
             await update.message.reply_text(
                 "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه پایین استفاده کنید.\n\n"
-                "‼️ لطفاً موضوع را در قالب یک پیام منسجم و واضح بنویسید 💙\n\n"
-                "✅ با لمس دکمه زیر گفتگو آغاز می‌شود.",
+                "‼️ لطفاً موضوع را در قالب یک پیام منسجم و واضح بنویسید؛ این کار باعث می‌شود پاسخگویی سریع‌تر انجام شود 💙\n\n"
+                "✅ با لمس دکمه زیر، گفتگو با تیم پشتیبانی آغاز می‌شود.",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
                 ])
@@ -271,8 +227,8 @@ async def handle(update: Update, context):
             return
 
 
-        # -------- TICKET CREATE --------
-        if user_ticket_mode.get(uid):
+        # ================= TICKET MODE (FIX + MEDIA + USER INFO) =================
+        if ticket_mode.get(uid):
 
             message_type = "text"
             file_id = None
@@ -291,12 +247,19 @@ async def handle(update: Update, context):
                 file_id = update.message.document.file_id
 
 
+            username = update.effective_user.username or "ندارد"
+            first_name = update.effective_user.first_name or ""
+            last_name = update.effective_user.last_name or ""
+
+            full_name = (first_name + " " + last_name).strip()
+
+
             cur.execute("""
             INSERT INTO tickets(user_id, username, message, status, created)
             VALUES (?, ?, ?, ?, ?)
             """, (
                 uid,
-                update.effective_user.username,
+                username,
                 caption,
                 "open",
                 int(time.time())
@@ -306,39 +269,49 @@ async def handle(update: Update, context):
 
             tid = cur.lastrowid
 
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{tid}")],
-                [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")]
-            ])
-
-            caption_text = f"🎫 تیکت #{tid}\n👤 {uid}\n\n📝 {caption}"
-
             for admin in ADMIN_IDS:
 
+                caption_text = (
+                    f"🎫 تیکت #{tid}\n\n"
+                    f"👤 نام: {full_name}\n"
+                    f"🆔 آیدی: {uid}\n"
+                    f"📛 یوزرنیم: @{username if username != 'ندارد' else 'ندارد'}\n\n"
+                    f"📝 پیام:\n{caption}"
+                )
+
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")]
+                ])
+
                 if message_type == "photo":
-                    await context.bot.send_photo(admin, file_id, caption_text, reply_markup=keyboard)
+                    await context.bot.send_photo(admin, file_id, caption=caption_text, reply_markup=keyboard)
 
                 elif message_type == "video":
-                    await context.bot.send_video(admin, file_id, caption_text, reply_markup=keyboard)
+                    await context.bot.send_video(admin, file_id, caption=caption_text, reply_markup=keyboard)
 
                 elif message_type == "document":
-                    await context.bot.send_document(admin, file_id, caption_text, reply_markup=keyboard)
+                    await context.bot.send_document(admin, file_id, caption=caption_text, reply_markup=keyboard)
 
                 else:
                     await context.bot.send_message(admin, caption_text, reply_markup=keyboard)
 
             await update.message.reply_text("✅ تیکت ثبت شد")
-
-            user_ticket_mode[uid] = False
+            ticket_mode[uid] = False
             return
 
 
-    # ================= ADMIN PANEL =================
+    # -------- ADMIN PANEL --------
     if uid in ADMIN_IDS:
 
         if text == "📋 تیکت‌های باز":
 
-            cur.execute("SELECT id, user_id, message FROM tickets WHERE status='open'")
+            cur.execute("""
+            SELECT id, user_id, message
+            FROM tickets
+            WHERE status='open'
+            """)
+
             rows = cur.fetchall()
 
             if not rows:
@@ -348,7 +321,7 @@ async def handle(update: Update, context):
             for tid, user, msg in rows:
 
                 keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{tid}")],
+                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{user}")],
                     [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")]
                 ])
 
