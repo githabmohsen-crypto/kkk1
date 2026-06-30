@@ -390,22 +390,36 @@ async def handle(update: Update, context):
         db.commit()
     
         for admin in ADMIN_IDS:
-            if photo:
                 keyboard = InlineKeyboardMarkup([
                     [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
                     [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-                    [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
-])
-                await context.bot.send_photo(
-                    admin,
-                    photo[-1].file_id,
-                    caption=f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {caption or ''}"
-                )
+                    [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]    
+            if photo:
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+            ])
+            
+            await context.bot.send_photo(
+                admin,
+                photo[-1].file_id,
+                caption=f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {caption or ''}",
+                reply_markup=keyboard
+            )
+                )/*************************
             else:
-                await context.bot.send_message(
-                    admin,
-                    f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {text}"
-                )
+                keyboard = InlineKeyboardMarkup([
+                    
+                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                    [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+            ])
+            await context.bot.send_message(
+                admin,
+                f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {text}",
+                reply_markup=keyboard
+            )
     
         await update.message.reply_text("✅ تیکت ثبت شد")
         ticket_mode[uid] = False
