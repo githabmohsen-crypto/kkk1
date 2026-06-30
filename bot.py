@@ -217,10 +217,32 @@ async def callback(update: Update, context):
         return
 
     if q.data.startswith("ban_"):
+    
         target = int(q.data.split("_")[1])
-        cur.execute("INSERT OR IGNORE INTO banned(user_id) VALUES(?)", (target,))
+    
+        cur.execute(
+            "INSERT OR IGNORE INTO banned(user_id) VALUES(?)",
+            (target,)
+        )
+    
         db.commit()
-        await q.edit_message_text("🚫 کاربر بن شد")
+    
+        try:
+            await context.bot.send_message(
+                target,
+                "🚫 شما از سیستم مسدود شده‌اید"
+            )
+        except:
+            pass
+    
+        await q.edit_message_reply_markup(
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🚫 کاربر بن شد", callback_data="done")]
+            ])
+        )
+    
+        await q.answer("کاربر بن شد")
+    
         return
 
 # ---------------- HANDLE ----------------
