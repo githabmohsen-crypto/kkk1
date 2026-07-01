@@ -182,31 +182,28 @@ async def callback(update: Update, context):
 
     if q.data.startswith("close_"):
     
-        tid = int(q.data.split("_")[1])
+        tid = int(
+            q.data.split("_")[1]
+        )
     
         cur.execute(
-            "UPDATE tickets SET status='closed' WHERE id=?",
+            "SELECT user_id FROM tickets WHERE id=?",
             (tid,)
         )
-        
-        db.commit()
-        
-        cur.execute(
-            "DELETE FROM active_tickets WHERE user_id=?",
-            (user_id,)
-        )
-        
-        db.commit()
-        
-        await q.edit_message_text("✔ بسته شد")
     
         row = cur.fetchone()
     
         if not row:
-            await q.answer("تیکت پیدا نشد")
+    
+            await q.answer(
+                "تیکت پیدا نشد"
+            )
+    
             return
     
+    
         user_id = row[0]
+    
     
         cur.execute(
             "UPDATE tickets SET status='closed' WHERE id=?",
@@ -215,7 +212,34 @@ async def callback(update: Update, context):
     
         db.commit()
     
-        await q.edit_message_text("✔ بسته شد")
+    
+        cur.execute(
+            "DELETE FROM active_tickets WHERE user_id=?",
+            (user_id,)
+        )
+    
+        db.commit()
+    
+    
+        await q.edit_message_reply_markup(
+            reply_markup=None
+        )
+    
+    
+        try:
+    
+            await context.bot.send_message(
+                user_id,
+                "✅ تیکت شما توسط پشتیبانی بسته شد"
+            )
+    
+        except:
+            pass
+    
+    
+        await q.answer(
+            "تیکت بسته شد"
+        )
     
         await context.bot.send_message(
             user_id,
