@@ -455,54 +455,33 @@ async def handle(update: Update, context):
         return
 
     if ticket_mode.get(uid):
-        print("ENTER TICKET")
+    
         username = update.effective_user.username or "ندارد"
     
-        cur.execute(
-            "SELECT ticket_id FROM active_tickets WHERE user_id=?",
-            (uid,)
+        await update.message.reply_text(
+            "⏳ در حال ثبت تیکت..."
         )
     
-        row = cur.fetchone()
-    
-        if row:
-    
-            tid = row[0]
-    
-        else:
-    
-            cur.execute("""
-            INSERT INTO tickets(
-            user_id,
+        cur.execute("""
+        INSERT INTO tickets(
+        user_id,
+        username,
+        message,
+        status,
+        created
+        )
+        VALUES(?,?,?,?,?)
+        """, (
+            uid,
             username,
-            message,
-            status,
-            created
-            )
-            VALUES(?,?,?,?,?)
-            """, (
-                uid,
-                username,
-                "",
-                "open",
-                int(time.time())
-            ))
+            text or caption,
+            "open",
+            int(time.time())
+        ))
     
-            tid = cur.lastrowid
+        db.commit()
     
-            cur.execute("""
-            INSERT INTO active_tickets(
-            user_id,
-            ticket_id
-            )
-            VALUES(?,?)
-            """, (
-                uid,
-                tid
-            ))
-    
-            db.commit()
-    
+        tid = cur.lastrowid
     
         keyboard = InlineKeyboardMarkup([
             [
@@ -513,18 +492,11 @@ async def handle(update: Update, context):
             ],
             [
                 InlineKeyboardButton(
-                    "🚫 بن",
+                    "🚫 بن کاربر",
                     callback_data=f"ban_{uid}"
                 )
             ]
         ])
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✉️ پاسخ", callback_data=f"reply_{uid}")],
-            [InlineKeyboardButton("✔️ بستن", callback_data=f"close_{tid}")],
-            [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")],
-            [InlineKeyboardButton("✅ رفع بن", callback_data=f"unban_{uid}")]
-        ])
-    
     
         for admin in ADMIN_IDS:
     
@@ -533,7 +505,11 @@ async def handle(update: Update, context):
                 await context.bot.send_photo(
                     admin,
                     photo[-1].file_id,
-                    caption=f"🎫 #{tid}\n👤 @{username}\n🆔 {uid}\n\n{caption}",
+                    caption=
+                    f"🎫 تیکت #{tid}\n"
+                    f"👤 @{username}\n"
+                    f"🆔 {uid}\n\n"
+                    f"{caption}",
                     reply_markup=keyboard
                 )
     
@@ -541,22 +517,17 @@ async def handle(update: Update, context):
     
                 await context.bot.send_message(
                     admin,
-                    f"🎫 #{tid}\n👤 @{username}\n🆔 {uid}\n\n{text}",
+                    f"🎫 تیکت #{tid}\n"
+                    f"👤 @{username}\n"
+                    f"🆔 {uid}\n\n"
+                    f"{text}",
                     reply_markup=keyboard
                 )
     
-    
         await update.message.reply_text(
-                "تیکت شما به واحد پشتیبانی ارسال شد ✅\n\n"
-        
-                "1️⃣ درخواست شما در صف بررسی تیم پشتیبانی قرار گرفت و در اولین فرصت پاسخ داده خواهد شد.\n\n"
-                    
-                "2️⃣ لطفاً از ارسال پیام‌های تکراری یا اسپم خودداری کنید تا روند رسیدگی سریع‌تر انجام شود.\n\n"
-                    
-                "3️⃣ زمان پاسخ‌دهی ممکن است بسته به حجم درخواست‌ها متفاوت باشد.\n\n"
-                    
-                "💙 از صبوری و همراهی شما سپاسگزاریم."
-                )
+            "تیکت شما به واحد پشتیبانی ارسال شد ✅\n\n"
+            "1️⃣ درخواست شما"
+            )
         return
 async def unban_cmd(update: Update, context):
 
