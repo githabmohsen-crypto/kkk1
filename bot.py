@@ -64,16 +64,6 @@ tickets_count INTEGER DEFAULT 0
 
 db.commit()
 
-cur.execute("""
-CREATE TABLE IF NOT EXISTS receipts(
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-user_id INTEGER,
-username TEXT,
-status TEXT DEFAULT 'pending'
-)
-""")
-
-db.commit()
 try:
     cur.execute("ALTER TABLE tickets ADD COLUMN waiting_admin INTEGER DEFAULT 1")
     db.commit()
@@ -133,19 +123,13 @@ async def enforce_channel(update, context):
 # ---------------- MENUS ----------------
 def user_menu():
     return ReplyKeyboardMarkup(
-        [["👤 پروفایل من"], ["📞 تماس با پشتیبانی"], ["📜 قوانین"], ["📨 ارسال رسید"],["❓ راهنما"]],
+        [["👤 پروفایل من"], ["📞 تماس با پشتیبانی"], ["📜 قوانین"], ["📨 ارسال رسید"]],
         resize_keyboard=True
     )
 
 def admin_menu():
     return ReplyKeyboardMarkup(
-        [
-            ["📋 تیکت‌های باز"],
-            ["📊 گزارش پنل"],
-            ["📣 ارسال همگانی"],
-            ["✅ رفع افراد مسدود شده"],
-            ["🗑 پاکسازی گزارش پنل"]
-        ],
+        [["📋 تیکت‌های باز"], ["📊 گزارش پنل"], ["📣 ارسال همگانی"], ["✅ رفع افراد مسدود شده"]],
         resize_keyboard=True
     )
 
@@ -186,65 +170,28 @@ async def callback(update: Update, context):
 
     if q.data == "start_ticket":
     
-        cur.execute("""
-            SELECT id FROM tickets
-            WHERE user_id=? AND status='open'
-            ORDER BY id DESC
-            LIMIT 1
-        """, (uid,))
+        cur.execute(
+            "SELECT id FROM tickets WHERE user_id=? AND status='open'",
+            (uid,)
+        )
+    
         ticket = cur.fetchone()
     
-        if not ticket:
-            cur.execute("""
-                INSERT INTO tickets(user_id, username, message, status, created, waiting_admin)
-                VALUES (?, ?, ?, 'open', ?, 1)
-            """, (uid, update.effective_user.username or "ندارد", "", int(time.time())))
-            db.commit()
+        if ticket:
+            await q.message.reply_text(
+                "📩 شما در حال حاضر یک تیکت فعال دارید.\n\n"
+                "در صورتی که پیام قبلی شما توسط پشتیبانی پاسخ داده شده باشد، می‌توانید اکنون پیام جدید خود را ارسال کنید.")
+            return
     
         ticket_mode[uid] = True
+        await q.message.reply_text("✍ پیام خود را ارسال کنید")
+        return
+    if q.data == "continue_chat":
+    
+        continue_chat[uid] = True
     
         await q.message.reply_text(
-            "✍ پیام خود را ارسال کنید"
-        )
-    
-        return
-    if q.data.startswith("accept_receipt_"):
-
-        receipt_id = int(q.data.split("_")[2])
-    
-        cur.execute(
-            "UPDATE receipts SET status='accepted' WHERE id=?",
-            (receipt_id,)
-        )
-    
-        db.commit()
-    
-        await q.answer("✅ رسید تایید شد")
-    
-        await q.edit_message_reply_markup(
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("✅ رسید تایید شد", callback_data="done")]
-            ])
-        )
-    
-        return
-    if q.data.startswith("reject_receipt_"):
-
-        receipt_id = int(q.data.split("_")[2])
-    
-        cur.execute(
-            "UPDATE receipts SET status='rejected' WHERE id=?",
-            (receipt_id,)
-        )
-    
-        db.commit()
-    
-        await q.answer("❌ رسید رد شد")
-    
-        await q.edit_message_reply_markup(
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("❌ رسید رد شد", callback_data="done")]
-            ])
+            "✍ پیام خود را برای ادامه گفتگو ارسال کنید."
         )
     
         return
@@ -382,18 +329,6 @@ async def handle(update: Update, context):
                 return
 
         # FIX 1: REPORT ALWAYS WORKS
-        if text == "🗑 پاکسازی گزارش پنل":
-
-            cur.execute("DELETE FROM tickets")
-            cur.execute("DELETE FROM receipts")
-        
-            db.commit()
-        
-            await update.message.reply_text(
-                "✅ گزارش پنل با موفقیت پاک شد."
-            )
-        
-            return
         if text == "📊 گزارش پنل":
 
             cur.execute("SELECT COUNT(*) FROM users")
@@ -411,37 +346,6 @@ async def handle(update: Update, context):
             cur.execute("SELECT user_id FROM banned")
             banned_list = cur.fetchall()
             banned_text = "\n".join([str(x[0]) for x in banned_list]) or "ندارد"
-            cur.execute("""
-            SELECT user_id, username, COUNT(*)
-            FROM receipts
-            WHERE status='accepted'
-            GROUP BY user_id, username
-            """)
-            
-            rows = cur.fetchall()
-            
-            receipt_text = ""
-            
-            with_username = []
-            without_username = []
-            
-            for user_id, username, count in rows:
-            
-                if username and username != "ندارد":
-                    with_username.append((username, count))
-                else:
-                    without_username.append((user_id, count))
-            
-            # ابتدا کسانی که یوزرنیم دارند
-            for username, count in with_username:
-                receipt_text += f"@{username} : {count}\n"
-            
-            # سپس کسانی که یوزرنیم ندارند
-            for user_id, count in without_username:
-                receipt_text += f"🆔 {user_id} : {count}\n"
-            
-            if receipt_text == "":
-                receipt_text = "ندارد"
 
             await update.message.reply_text(
                 f"📊 گزارش سیستم\n\n"
@@ -449,8 +353,7 @@ async def handle(update: Update, context):
                 f"🎫 تیکت‌ها: {tickets}\n"
                 f"🚫 بن: {banned}\n"
                 f"⭐ میانگین رضایت: {round(avg,2)}\n\n"
-                f"🚫 لیست بن‌ها:\n{banned_text}\n\n"
-                f"🧾 رسیدهای تایید شده:\n{receipt_text}"
+                f"🚫 لیست بن‌ها:\n{banned_text}"
             )
             return
 
@@ -566,17 +469,7 @@ async def handle(update: Update, context):
                 f"📅 عضویت: {time.strftime('%Y-%m-%d', time.localtime(join_time))}"
             )
         return
-    if "راهنما" in (text or ""):
-        await update.message.reply_text(
-            "📌 راهنمای استفاده از ربات\n\n"
-            "🔹 برای ارسال سوالات خود، گزینه «📞 تماس با پشتیبانی» را انتخاب کنید.\n\n"
-            "🔹 رسیدهای خود را از بخش «📨 ارسال رسید» بارگذاری کنید.\n\n"
-            "🔹 بررسی و پرداخت رسیدها بین ساعت ۱۲ شب تا ۲ بامداد انجام می‌شود.\n"
-            "پس از بررسی، نتیجه در پیوی شما ارسال خواهد شد.\n\n"
-            "🔹 لطفاً سوالات خود را مستقیماً از ادمین نپرسید.\n"
-            "در صورت تخلف، شامل جریمه خواهید شد."
-        )
-        return
+
     if text == "📜 قوانین":
         await update.message.reply_text(
             "📜 قوانین سیستم پشتیبانی Kaletek\n\n"
@@ -623,17 +516,9 @@ async def handle(update: Update, context):
         tid = row[0] if row else 0
     
         username = update.effective_user.username or "ندارد"
-        cur.execute("""
-        INSERT INTO receipts(user_id, username)
-        VALUES(?, ?)
-        """, (uid, username))
-        
-        db.commit()
-
-        receipt_id = cur.lastrowid
     
         for admin in ADMIN_IDS:
-        
+    
             await context.bot.send_photo(
                 admin,
                 photo[-1].file_id,
@@ -643,30 +528,18 @@ async def handle(update: Update, context):
                     f"🆔 {uid}"
                 ),
                 reply_markup=InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("✅ تایید رسید", callback_data=f"accept_receipt_{receipt_id}")
-                    ],
-                    [
-                        InlineKeyboardButton("❌ عدم تایید", callback_data=f"reject_receipt_{receipt_id}")
-                    ],
-                    [
-                        InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")
-                    ],
-                    [
-                        InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")
-                    ],
-                    [
-                        InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")
-                    ]
+                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                    [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
                 ])
             )
-        
+    
         await update.message.reply_text(
             "✅ رسید شما با موفقیت ارسال شد."
         )
-        
+    
         receipt_mode.pop(uid, None)
-        
+    
         return
         
 
@@ -710,31 +583,33 @@ async def handle(update: Update, context):
     LIMIT 1
     """, (uid,))
 
-    if ticket:
-        tid, waiting = ticket
-    
-        # اگر کاربر اجازه ادامه گرفته
-        can_continue = continue_chat.pop(uid, False)
-    
-        if waiting == 1 and not can_continue:
-            await update.message.reply_text(
-                "⏳ پیام قبلی شما هنوز پاسخ داده نشده.\n"
-                "برای ادامه گفتگو روی دکمه «ادامه گفتگو» بزنید."
-            )
-            return
+    ticket = cur.fetchone()
+    if ticket and text not in [
+        "👤 پروفایل من",
+        "📞 تماس با پشتیبانی",
+        "📜 قوانین"
+    ]:
 
-    if ticket and text not in ["👤 پروفایل من", "📞 تماس با پشتیبانی", "📜 قوانین"]:
-    
         tid, waiting = ticket
     
-        # اگر هنوز منتظر ادامه هست
         if waiting == 1 and not continue_chat.get(uid):
     
             await update.message.reply_text(
-                "⏳ پیام قبلی شما هنوز در حال بررسی است.\n"
-                "برای ادامه گفتگو روی «🔄 ادامه گفتگو با ادمین» بزنید."
+                "⏳ پیام قبلی شما در حال بررسی توسط پشتیبانی است.\n\n"
+                "لطفاً تا زمان پاسخگویی منتظر بمانید."
             )
+    
             return
+
+    if ticket and text not in ["👤 پروفایل من", "📞 تماس با پشتیبانی", "📜 قوانین"]:
+        if not continue_chat.get(uid):
+        
+            await update.message.reply_text(
+                "برای ارسال پیام جدید ابتدا روی دکمه «🔄 ادامه گفتگو با ادمین» بزنید."
+            )
+        
+            return
+            
 
         tid, waiting = ticket
 
