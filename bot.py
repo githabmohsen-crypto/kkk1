@@ -732,14 +732,17 @@ async def handle(update: Update, context):
             return
 
     if ticket and text not in ["👤 پروفایل من", "📞 تماس با پشتیبانی", "📜 قوانین"]:
-        if not continue_chat.get(uid):
-        
+    
+        tid, waiting = ticket
+    
+        # اگر هنوز منتظر ادامه هست
+        if waiting == 1 and not continue_chat.get(uid):
+    
             await update.message.reply_text(
-                "برای ارسال پیام جدید ابتدا روی دکمه «🔄 ادامه گفتگو با ادمین» بزنید."
+                "⏳ پیام قبلی شما هنوز در حال بررسی است.\n"
+                "برای ادامه گفتگو روی «🔄 ادامه گفتگو با ادمین» بزنید."
             )
-        
             return
-            
 
         tid, waiting = ticket
 
