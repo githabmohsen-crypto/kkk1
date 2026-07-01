@@ -492,18 +492,18 @@ async def handle(update: Update, context):
         """, (tid,))
 
         db.commit()
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-                [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-                [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
-            ])
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+            [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+            [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+        ])
         
-            for admin in ADMIN_IDS:
-                await context.bot.send_message(
-                    admin,
-                    f"📨 پیام جدید برای تیکت #{tid}\n\n{text or caption}",
-                    reply_markup=keyboard
-                )
+        for admin in ADMIN_IDS:
+            await context.bot.send_message(
+                admin,
+                f"📨 پیام جدید برای تیکت #{tid}\n\n{text or caption}",
+                reply_markup=keyboard
+            )
         
         return
 
