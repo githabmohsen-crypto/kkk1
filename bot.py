@@ -569,7 +569,7 @@ async def handle(update: Update, context):
                 f"📅 عضویت: {time.strftime('%Y-%m-%d', time.localtime(join_time))}"
             )
         return
-    if text == "📖 راهنما":
+    if "راهنما" in (text or ""):
         await update.message.reply_text(
             "📌 راهنمای استفاده از ربات\n\n"
             "🔹 برای ارسال سوالات خود، گزینه «📞 تماس با پشتیبانی» را انتخاب کنید.\n\n"
