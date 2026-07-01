@@ -119,9 +119,37 @@ async def enforce_channel(update, context):
     return True
 
 # ---------------- MENUS ----------------
-def user_menu():
+def user_menu(uid=None):
+
+    support_btn = "📞 تماس با پشتیبانی"
+
+    if uid:
+        cur.execute("""
+            SELECT waiting_admin
+            FROM tickets
+            WHERE user_id=? AND status='open'
+            ORDER BY id DESC
+            LIMIT 1
+        """, (uid,))
+
+        row = cur.fetchone()
+
+        if row:
+            waiting = row[0]
+
+            if waiting == 1:
+                support_btn = "🟡 ادامه گفتگو با پشتیبانی"
+            else:
+                support_btn = "🔵 ادامه گفتگو با پشتیبانی"
+
+    keyboard = [
+        ["👤 پروفایل من"],
+        [support_btn],
+        ["📜 قوانین"]
+    ]
+
     return ReplyKeyboardMarkup(
-        [["👤 پروفایل من"], ["📞 تماس با پشتیبانی"], ["📜 قوانین"]],
+        keyboard,
         resize_keyboard=True
     )
 
@@ -142,7 +170,7 @@ async def start(update: Update, context):
     if uid in ADMIN_IDS:
         await update.message.reply_text("🛠 پنل ادمین", reply_markup=admin_menu())
     else:
-        await update.message.reply_text("👋 خوش آمدید", reply_markup=user_menu())
+        await update.message.reply_text("👋 خوش آمدید", reply_markup=user_menu(uid))
 
 # ---------------- CALLBACK ----------------
 async def callback(update: Update, context):
@@ -154,7 +182,7 @@ async def callback(update: Update, context):
 
     if q.data == "check":
         if await is_member(context, uid):
-            await context.bot.send_message(uid, "✅ عضویت تایید شد", reply_markup=user_menu())
+            await context.bot.send_message(uid, "✅ عضویت تایید شد", reply_markup=user_menu(uid))
         else:
             await context.bot.send_message(
                 uid,
@@ -464,8 +492,12 @@ async def handle(update: Update, context):
             "💙 با استفاده از ربات قوانین را پذیرفته‌اید"
         )
         return
-
-    if text == "📞 تماس با پشتیبانی":
+    
+    if text in [
+        "📞 تماس با پشتیبانی",
+        "🟡 ادامه گفتگو با پشتیبانی",
+        "🔵 ادامه گفتگو با پشتیبانی"
+    ]:
 # اگر پیام قبلی وجود دارد حذفش کن
         if uid in support_message:
             try:
