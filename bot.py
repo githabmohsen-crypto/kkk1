@@ -140,7 +140,13 @@ def user_menu():
 
 def admin_menu():
     return ReplyKeyboardMarkup(
-        [["📋 تیکت‌های باز"], ["📊 گزارش پنل"], ["📣 ارسال همگانی"], ["✅ رفع افراد مسدود شده"]],
+        [
+            ["📋 تیکت‌های باز"],
+            ["📊 گزارش پنل"],
+            ["📣 ارسال همگانی"],
+            ["✅ رفع افراد مسدود شده"],
+            ["🗑 پاکسازی گزارش پنل"]
+        ],
         resize_keyboard=True
     )
 
@@ -380,6 +386,18 @@ async def handle(update: Update, context):
                 return
 
         # FIX 1: REPORT ALWAYS WORKS
+        if text == "🗑 پاکسازی گزارش پنل":
+
+            cur.execute("DELETE FROM tickets")
+            cur.execute("DELETE FROM receipts")
+        
+            db.commit()
+        
+            await update.message.reply_text(
+                "✅ گزارش پنل با موفقیت پاک شد."
+            )
+        
+            return
         if text == "📊 گزارش پنل":
 
             cur.execute("SELECT COUNT(*) FROM users")
