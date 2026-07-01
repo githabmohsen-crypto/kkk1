@@ -557,10 +557,6 @@ async def handle(update: Update, context):
     
         support_message[uid] = msg.message_id
         return
-        support_message[uid] = msg.message_id
-        return
-        support_message[uid] = msg.message_id
-        return
         if ticket_mode.get(uid):
     
             ticket_mode[uid] = False
