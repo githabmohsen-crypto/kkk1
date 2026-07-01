@@ -494,7 +494,7 @@ async def handle(update: Update, context):
     
         return
     if receipt_mode.get(uid):
-
+    
         if not photo:
     
             await update.message.reply_text(
@@ -502,6 +502,7 @@ async def handle(update: Update, context):
             )
     
             return
+    
         cur.execute("""
         SELECT id
         FROM tickets
@@ -509,11 +510,37 @@ async def handle(update: Update, context):
         ORDER BY id DESC
         LIMIT 1
         """, (uid,))
-        
+    
         row = cur.fetchone()
-        
+    
         tid = row[0] if row else 0
+    
         username = update.effective_user.username or "ندارد"
+    
+        for admin in ADMIN_IDS:
+    
+            await context.bot.send_photo(
+                admin,
+                photo[-1].file_id,
+                caption=(
+                    f"🧾 رسید جدید\n\n"
+                    f"👤 @{username}\n"
+                    f"🆔 {uid}"
+                ),
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                    [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+                ])
+            )
+    
+        await update.message.reply_text(
+            "✅ رسید شما با موفقیت ارسال شد."
+        )
+    
+        receipt_mode.pop(uid, None)
+    
+        return
         
 
     if text == "📞 تماس با پشتیبانی":
