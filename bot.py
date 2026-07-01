@@ -431,6 +431,14 @@ async def handle(update: Update, context):
         
             target = reply_mode[uid]
         
+            # اول وضعیت تیکت را تغییر بده
+            cur.execute("""
+            UPDATE tickets
+            SET waiting_admin=0
+            WHERE user_id=? AND status='open'
+            """, (target,))
+            db.commit()
+        
             if photo:
                 await context.bot.send_photo(
                     target,
@@ -442,33 +450,19 @@ async def handle(update: Update, context):
                     target,
                     f"📩 پاسخ پشتیبانی:\n\n{text}"
                 )
-                await context.bot.send_message(
-                    target,
-                    " ",
-                    reply_markup=user_menu(target)
-                )
-                ticket_mode[target] = True
         
-            cur.execute("""
-            UPDATE tickets
-            SET waiting_admin=0
-            WHERE user_id=? AND status='open'
-            """, (target,))
-            db.commit()
+            # حالا کیبورد را بروزرسانی کن
+            await context.bot.send_message(
+                target,
+                "💬 می‌توانید پاسخ خود را ارسال کنید.",
+                reply_markup=user_menu(target)
+            )
+        
+            ticket_mode[target] = True
         
             await update.message.reply_text("✅ ارسال شد")
+        
             del reply_mode[uid]
-            return
-        if uid in ADMIN_IDS and unban_mode.get(uid):
-    
-            target = int(text)
-        
-            cur.execute("DELETE FROM banned WHERE user_id=?", (target,))
-            db.commit()
-        
-            await update.message.reply_text(f"✅ کاربر {target} رفع بن شد")
-        
-            unban_mode[uid] = False
             return
 
     # ---------------- USER ----------------
