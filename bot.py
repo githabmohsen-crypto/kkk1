@@ -399,7 +399,7 @@ async def handle(update: Update, context):
             cur.execute("""
             SELECT user_id, username, COUNT(*)
             FROM receipts
-            WHERE approved=1
+            WHERE status='accepted'
             GROUP BY user_id, username
             """)
             
