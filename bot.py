@@ -525,42 +525,6 @@ async def handle(update: Update, context):
             broadcast_mode[uid] = False
             await update.message.reply_text("✅ ارسال شد")
             return
-
-        if uid in reply_mode:
-        
-            target = reply_mode[uid]
-        
-            if photo:
-                await context.bot.send_photo(
-                    target,
-                    photo[-1].file_id,
-                    caption=caption or ""
-                )
-            else:
-                await context.bot.send_message(
-                    target,
-                    f"📩 پاسخ پشتیبانی:\n\n{text}",
-                    reply_markup=InlineKeyboardMarkup([
-                        [
-                            InlineKeyboardButton(
-                                "🔄 ادامه گفتگو با ادمین",
-                                callback_data="continue_chat"
-                            )
-                        ]
-                    ])
-                )
-        
-                ticket_mode[target] = True
-            cur.execute("""
-            UPDATE tickets
-            SET waiting_admin=0
-            WHERE user_id=? AND status='open'
-            """, (target,))
-            db.commit()
-        
-            await update.message.reply_text("✅ ارسال شد")
-            del reply_mode[uid]
-            return
         if uid in ADMIN_IDS and unban_mode.get(uid):
     
             target = int(text)
@@ -916,6 +880,39 @@ async def handle(update: Update, context):
             
         ticket_mode[uid] = False
         return
+     if uid in reply_mode:
+        
+        target = reply_mode[uid]
+        
+        if photo:
+            await context.bot.send_photo(
+                target,
+                photo[-1].file_id,
+                caption=caption or ""
+            )
+        else:
+            await context.bot.send_message(
+                target,
+                f"📩 پاسخ پشتیبانی:\n\n{text}",
+                reply_markup=InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton(
+                            "🔄 ادامه گفتگو با ادمین",
+                            callback_data="continue_chat"
+                        )
+                    ]
+                ])
+            )
+    
+            ticket_mode[target] = True
+    
+        cur.execute("""
+        UPDATE tickets
+        SET waiting_admin=0
+        WHERE user_id=? AND status='open'
+        """, (target,))
+    
+        db.commit()       
 async def unban_cmd(update: Update, context):
 
     if update.effective_user.id not in ADMIN_IDS:
