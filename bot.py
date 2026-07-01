@@ -617,11 +617,11 @@ async def handle(update: Update, context):
                     "⏳ تیکت قبلی شما در حال بررسی است.\nلطفاً منتظر پاسخ پشتیبانی بمانید."
                 )
                 ticket_mode[uid] = False
-
-            await update.message.reply_text(
-                "💬 گفتگو آغاز شد.",
-                reply_markup=user_menu(uid)
-            )
+        
+                await update.message.reply_text(
+                    "💬 گفتگو آغاز شد.",
+                    reply_markup=user_menu(uid)
+                )
                 return
         
             cur.execute("""
