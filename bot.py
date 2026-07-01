@@ -666,8 +666,20 @@ async def handle(update: Update, context):
             """, (uid,))
         
         ticket = cur.fetchone()
-        
-        
+
+            if ticket:
+
+                tid, waiting = ticket
+    
+                if waiting == 1:
+    
+                    await update.message.reply_text(
+                        "⏳ تیکت قبلی شما در حال بررسی است.\nلطفاً منتظر پاسخ پشتیبانی بمانید."
+                    )
+    
+                    ticket_mode[uid] = False
+                    return
+            
             cur.execute("""
             UPDATE tickets
             SET message = message || '\n\n' || ?
