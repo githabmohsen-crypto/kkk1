@@ -474,25 +474,24 @@ async def handle(update: Update, context):
     """, (uid,))
 
     ticket = cur.fetchone()
-        # اگر تیکت باز دارد، بدون نیاز به زدن دکمه، پیام به همان تیکت اضافه شود
-        if ticket and text not in ["👤 پروفایل من", "📞 تماس با پشتیبانی", "📜 قوانین"]:
-        
-            tid = ticket[0]
-        
-            cur.execute("""
-            UPDATE tickets
-            SET message = message || '\n\n' || ?
-            WHERE id=?
-            """, (text or caption, tid))
-        
-            cur.execute("""
-            UPDATE tickets
-            SET waiting_admin=1
-            WHERE id=?
-            """, (tid,))
-        
-            db.commit()
-        
+
+    if ticket and text not in ["👤 پروفایل من", "📞 تماس با پشتیبانی", "📜 قوانین"]:
+
+        tid = ticket[0]
+
+        cur.execute("""
+        UPDATE tickets
+        SET message = message || '\n\n' || ?
+        WHERE id=?
+        """, (text or caption, tid))
+
+        cur.execute("""
+        UPDATE tickets
+        SET waiting_admin=1
+        WHERE id=?
+        """, (tid,))
+
+        db.commit()
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
                 [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
