@@ -176,7 +176,7 @@ async def callback(update: Update, context):
         ticket = cur.fetchone()
     
         if ticket:
-            await q.message.reply_text("❌ شما یک تیکت باز دارید.")
+            await q.message.reply_text("❌ . شما یک تیکت باز دارید می توانید اکنون پیام خود را بنویسید. ")
             return
     
         ticket_mode[uid] = True
@@ -469,6 +469,9 @@ async def handle(update: Update, context):
         await update.message.reply_text(
             "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه پایین استفاده کنید.\n\n"
             "‼️ لطفاً موضوع را در قالب یک پیام منسجم و واضح بنویسید؛ این کار باعث می‌شود پاسخگویی سریع‌تر انجام شود 💙\n\n"
+            " بعد از باز شدن تیکت جدید، تنها مجاز به ارسال یک پیام هستید و تا زمانی که پاسخ ادمین ثبت نشده باشد \n\n "
+            "امکان ارسال پیام بعدی وجود ندارد. لطفاً پیام خود را با دقت کامل ثبت کنید تا روند رسیدگی سریع‌تر انجام شود. ⏳📩\n\n"
+           " هرگونه بی‌احترامی به ادمین منجر به مسدودسازی دائمی حساب شما از سیستم خواهد شد. 🚫🔒\n \n"
             "✅ با لمس دکمه زیر، گفتگو با تیم پشتیبانی آغاز می‌شود.",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
