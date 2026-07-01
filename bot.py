@@ -64,6 +64,11 @@ tickets_count INTEGER DEFAULT 0
 
 db.commit()
 
+try:
+    cur.execute("ALTER TABLE tickets ADD COLUMN waiting_admin INTEGER DEFAULT 1")
+    db.commit()
+except:
+    pass
 # ---------------- STATES ----------------
 ticket_mode = {}
 reply_mode = {}
@@ -379,14 +384,28 @@ async def handle(update: Update, context):
             return
 
         if uid in reply_mode:
-
+        
             target = reply_mode[uid]
-
+        
             if photo:
-                await context.bot.send_photo(target, photo[-1].file_id, caption=caption or "")
+                await context.bot.send_photo(
+                    target,
+                    photo[-1].file_id,
+                    caption=caption or ""
+                )
             else:
-                await context.bot.send_message(target, f"📩 پاسخ پشتیبانی:\n\n{text}")
-
+                await context.bot.send_message(
+                    target,
+                    f"📩 پاسخ پشتیبانی:\n\n{text}"
+                )
+        
+            cur.execute("""
+            UPDATE tickets
+            SET waiting_admin=0
+            WHERE user_id=? AND status='open'
+            """, (target,))
+            db.commit()
+        
             await update.message.reply_text("✅ ارسال شد")
             del reply_mode[uid]
             return
@@ -449,10 +468,64 @@ async def handle(update: Update, context):
     if ticket_mode.get(uid):
     
         username = update.effective_user.username or "ندارد"
-    
+        
+    cur.execute("""
+        SELECT id, waiting_admin
+        FROM tickets
+        WHERE user_id=? AND status='open'
+        ORDER BY id DESC
+        LIMIT 1
+        """, (uid,))
+        
+        ticket = cur.fetchone()
+        
+        if ticket:
+        
+            tid, waiting = ticket
+        
+            if waiting == 1:
+                await update.message.reply_text(
+                    "⏳ تیکت قبلی شما در حال بررسی است.\nلطفاً منتظر پاسخ پشتیبانی بمانید."
+                )
+                ticket_mode[uid] = False
+                return
+        
+            cur.execute("""
+            UPDATE tickets
+            SET message = message || '\n\n' || ?
+            WHERE id=?
+            """, (text or caption, tid))
+        
+            cur.execute("""
+            UPDATE tickets
+            SET waiting_admin=1
+            WHERE id=?
+            """, (tid,))
+        
+            db.commit()
+        
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+            ])
+        
+            for admin in ADMIN_IDS:
+                await context.bot.send_message(
+                    admin,
+                    f"📨 پیام جدید برای تیکت #{tid}\n\n{text or caption}",
+                    reply_markup=keyboard
+                )
+        
+            await update.message.reply_text(
+                "پیام شما به تیکت قبلی اضافه شد ✅"
+            )
+        
+            ticket_mode[uid] = False
+            return
         cur.execute("""
-        INSERT INTO tickets(user_id, username, message, status, created)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO tickets(user_id, username, message, status, created, waiting_admin)
+        VALUES (?, ?, ?, ?, ?, 1)
         """, (uid, username, text or caption, "open", int(time.time())))
         db.commit()
     
