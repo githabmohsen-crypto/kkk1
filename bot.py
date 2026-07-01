@@ -64,6 +64,17 @@ tickets_count INTEGER DEFAULT 0
 
 db.commit()
 
+cur.execute("""
+CREATE TABLE IF NOT EXISTS receipts(
+id INTEGER PRIMARY KEY AUTOINCREMENT,
+user_id INTEGER,
+username TEXT,
+status TEXT DEFAULT 'pending'
+)
+""")
+
+db.commit()
+
 try:
     cur.execute("ALTER TABLE tickets ADD COLUMN waiting_admin INTEGER DEFAULT 1")
     db.commit()
@@ -192,6 +203,46 @@ async def callback(update: Update, context):
     
         await q.message.reply_text(
             "✍ پیام خود را برای ادامه گفتگو ارسال کنید."
+        )
+    
+        return
+    if q.data.startswith("accept_receipt_"):
+
+        receipt_id = int(q.data.split("_")[2])
+    
+        cur.execute(
+            "UPDATE receipts SET status='accepted' WHERE id=?",
+            (receipt_id,)
+        )
+    
+        db.commit()
+    
+        await q.answer("✅ رسید تایید شد")
+    
+        await q.edit_message_reply_markup(
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ رسید تایید شد", callback_data="done")]
+            ])
+        )
+    
+        return
+    if q.data.startswith("reject_receipt_"):
+
+        receipt_id = int(q.data.split("_")[2])
+    
+        cur.execute(
+            "UPDATE receipts SET status='rejected' WHERE id=?",
+            (receipt_id,)
+        )
+    
+        db.commit()
+    
+        await q.answer("❌ رسید رد شد")
+    
+        await q.edit_message_reply_markup(
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("❌ رسید رد شد", callback_data="done")]
+            ])
         )
     
         return
@@ -346,6 +397,23 @@ async def handle(update: Update, context):
             cur.execute("SELECT user_id FROM banned")
             banned_list = cur.fetchall()
             banned_text = "\n".join([str(x[0]) for x in banned_list]) or "ندارد"
+            cur.execute("""
+            SELECT username, COUNT(*)
+            FROM receipts
+            WHERE status='accepted'
+            GROUP BY user_id
+            ORDER BY COUNT(*) DESC
+            """)
+            
+            rows = cur.fetchall()
+            
+            receipt_text = ""
+            
+            for username, count in rows:
+                receipt_text += f"@{username} : {count} رسید تایید شده\n"
+            
+            if receipt_text == "":
+                receipt_text = "ندارد"
 
             await update.message.reply_text(
                 f"📊 گزارش سیستم\n\n"
@@ -353,9 +421,9 @@ async def handle(update: Update, context):
                 f"🎫 تیکت‌ها: {tickets}\n"
                 f"🚫 بن: {banned}\n"
                 f"⭐ میانگین رضایت: {round(avg,2)}\n\n"
-                f"🚫 لیست بن‌ها:\n{banned_text}"
+                f"🚫 لیست بن‌ها:\n{banned_text}\n\n"
+                f"🧾 رسیدهای تایید شده:\n{receipt_text}"
             )
-            return
 
         if text == "📋 تیکت‌های باز":
 
@@ -516,6 +584,14 @@ async def handle(update: Update, context):
         tid = row[0] if row else 0
     
         username = update.effective_user.username or "ندارد"
+        cur.execute("""
+        INSERT INTO receipts(user_id, username)
+        VALUES(?, ?)
+        """, (uid, username))
+        
+        db.commit()
+        
+        receipt_id = cur.lastrowid
     
         for admin in ADMIN_IDS:
     
@@ -528,9 +604,21 @@ async def handle(update: Update, context):
                     f"🆔 {uid}"
                 ),
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-                    [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+                    [
+                        InlineKeyboardButton("✅ تایید رسید", callback_data=f"accept_receipt_{receipt_id}")
+                    ],
+                    [
+                        InlineKeyboardButton("❌ عدم تایید", callback_data=f"reject_receipt_{receipt_id}")
+                    ],
+                    [
+                        InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")
+                    ],
+                    [
+                        InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")
+                    ],
+                    [
+                        InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")
+                    ]
                 ])
             )
     
