@@ -184,19 +184,9 @@ async def callback(update: Update, context):
         return
 
     if q.data.startswith("reply_"):
-    
-        target = int(q.data.split("_")[1])
-    
-        reply_mode[uid] = target
-    
-        await context.bot.send_message(
-            target,
-            "👨‍💻 کارشناس در حال پاسخگویی به پیام شما..."
-        )
-    
+        reply_mode[uid] = int(q.data.split("_")[1])
         await q.message.reply_text("✉ پاسخ را بنویس")
-    
-        return
+    return
 
     if q.data.startswith("close_"):
     
