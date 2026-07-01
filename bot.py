@@ -503,7 +503,8 @@ async def handle(update: Update, context):
         "🟡 ادامه گفتگو با پشتیبانی",
         "🔵 ادامه گفتگو با پشتیبانی"
     ]:
-# اگر پیام قبلی وجود دارد حذفش کن
+    
+        # حذف پیام قبلی
         if uid in support_message:
             try:
                 await context.bot.delete_message(
@@ -512,8 +513,9 @@ async def handle(update: Update, context):
                 )
             except:
                 pass
+    
         ticket_mode[uid] = True
-        
+    
         msg = await update.message.reply_text(
             "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه پایین استفاده کنید.\n\n"
             "‼️ لطفاً موضوع را در قالب یک پیام منسجم و واضح بنویسید؛ این کار باعث می‌شود پاسخگویی سریع‌تر انجام شود 💙\n\n"
@@ -522,80 +524,9 @@ async def handle(update: Update, context):
                 [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
             ])
         )
-        
+    
         support_message[uid] = msg.message_id
-    cur.execute("""
-        SELECT id
-        FROM tickets
-        WHERE user_id=? AND status='open'
-        ORDER BY id DESC
-        LIMIT 1
-    """, (uid,))
-
-    cur.execute("""
-    SELECT id, waiting_admin
-    FROM tickets
-    WHERE user_id=? AND status='open'
-    ORDER BY id DESC
-    LIMIT 1
-    """, (uid,))
-
-    ticket = cur.fetchone()
-
-if ticket and text not in [
-    "👤 پروفایل من",
-    "📞 تماس با پشتیبانی",
-    "🟡 ادامه گفتگو با پشتیبانی",
-    "🔵 ادامه گفتگو با پشتیبانی",
-    "📜 قوانین"
-]:
-
-        tid, waiting = ticket
-
-        # اگر هنوز ادمین پاسخ نداده
-        if waiting == 1:
-            await update.message.reply_text(
-                "⏳ پیام قبلی شما هنوز توسط پشتیبانی پاسخ داده نشده است.\n\n"
-                "لطفاً تا دریافت پاسخ، از ارسال پیام جدید خودداری کنید."
-            )
-            return
-
-        # اضافه کردن پیام جدید به همان تیکت
-        cur.execute("""
-        UPDATE tickets
-        SET message = message || '\n\n' || ?
-        WHERE id=?
-        """, (text or caption, tid))
-
-        # دوباره منتظر پاسخ ادمین شود
-        cur.execute("""
-        UPDATE tickets
-        SET waiting_admin=1
-        WHERE id=?
-        """, (tid,))
-
-        db.commit()
-
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-            [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-            [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
-        ])
-
-        for admin in ADMIN_IDS:
-            await context.bot.send_message(
-                admin,
-                f"📨 پیام جدید برای تیکت #{tid}\n\n{text or caption}",
-                reply_markup=keyboard
-            )
-
-        await update.message.reply_text(
-            "✅ پیام شما ارسال شد."
-        )
-
         return
-
-    if ticket_mode.get(uid):
     
         username = update.effective_user.username or "ندارد"
     
