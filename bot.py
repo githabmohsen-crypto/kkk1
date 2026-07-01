@@ -397,19 +397,33 @@ async def handle(update: Update, context):
             banned_list = cur.fetchall()
             banned_text = "\n".join([str(x[0]) for x in banned_list]) or "ندارد"
             cur.execute("""
-            SELECT username, COUNT(*)
+            SELECT user_id, username, COUNT(*)
             FROM receipts
-            WHERE status='accepted'
-            GROUP BY user_id
-            ORDER BY COUNT(*) DESC
+            WHERE approved=1
+            GROUP BY user_id, username
             """)
             
             rows = cur.fetchall()
             
             receipt_text = ""
             
-            for username, count in rows:
-                receipt_text += f"@{username} : {count} رسید تایید شده\n"
+            with_username = []
+            without_username = []
+            
+            for user_id, username, count in rows:
+            
+                if username and username != "ندارد":
+                    with_username.append((username, count))
+                else:
+                    without_username.append((user_id, count))
+            
+            # ابتدا کسانی که یوزرنیم دارند
+            for username, count in with_username:
+                receipt_text += f"@{username} : {count}\n"
+            
+            # سپس کسانی که یوزرنیم ندارند
+            for user_id, count in without_username:
+                receipt_text += f"🆔 {user_id} : {count}\n"
             
             if receipt_text == "":
                 receipt_text = "ندارد"
