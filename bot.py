@@ -186,28 +186,25 @@ async def callback(update: Update, context):
 
     if q.data == "start_ticket":
     
-        cur.execute(
-            "SELECT id FROM tickets WHERE user_id=? AND status='open'",
-            (uid,)
-        )
-    
+        cur.execute("""
+            SELECT id FROM tickets
+            WHERE user_id=? AND status='open'
+            ORDER BY id DESC
+            LIMIT 1
+        """, (uid,))
         ticket = cur.fetchone()
     
-        if ticket:
-            await q.message.reply_text(
-                "📩 شما در حال حاضر یک تیکت فعال دارید.\n\n"
-                "در صورتی که پیام قبلی شما توسط پشتیبانی پاسخ داده شده باشد، می‌توانید اکنون پیام جدید خود را ارسال کنید.")
-            return
+        if not ticket:
+            cur.execute("""
+                INSERT INTO tickets(user_id, username, message, status, created, waiting_admin)
+                VALUES (?, ?, ?, 'open', ?, 1)
+            """, (uid, update.effective_user.username or "ندارد", "", int(time.time())))
+            db.commit()
     
         ticket_mode[uid] = True
-        await q.message.reply_text("✍ پیام خود را ارسال کنید")
-        return
-    if q.data == "continue_chat":
-    
-        continue_chat[uid] = True
     
         await q.message.reply_text(
-            "✍ پیام خود را برای ادامه گفتگو ارسال کنید."
+            "✍ پیام خود را ارسال کنید"
         )
     
         return
