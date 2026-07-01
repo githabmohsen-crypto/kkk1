@@ -592,13 +592,17 @@ async def handle(update: Update, context):
         row = cur.fetchone()
         
         tid = row[0] if row else 0
-    
+        username = update.effective_user.username or "ندارد"
         for admin in ADMIN_IDS:
     
             await context.bot.send_photo(
                 admin,
                 photo[-1].file_id,
-                caption=f"🧾 رسید جدید\n\n👤 کاربر: {uid}",
+                caption=(
+                    f"🧾 رسید جدید\n\n"
+                    f"👤 @{username}\n"
+                    f"🆔 {uid}"
+                ),
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
                     [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
