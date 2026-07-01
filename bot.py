@@ -656,7 +656,7 @@ async def handle(update: Update, context):
     if ticket_mode.get(uid):
     
         username = update.effective_user.username or "ندارد"
-        
+    
         cur.execute("""
             SELECT id, waiting_admin
             FROM tickets
@@ -664,21 +664,21 @@ async def handle(update: Update, context):
             ORDER BY id DESC
             LIMIT 1
             """, (uid,))
-        
+    
         ticket = cur.fetchone()
-
-            if ticket:
-
-                tid, waiting = ticket
     
-                if waiting == 1:
+        if ticket:
     
-                    await update.message.reply_text(
-                        "⏳ تیکت قبلی شما در حال بررسی است.\nلطفاً منتظر پاسخ پشتیبانی بمانید."
-                    )
+            tid, waiting = ticket
     
-                    ticket_mode[uid] = False
-                    return
+            if waiting == 1:
+    
+                await update.message.reply_text(
+                    "⏳ تیکت قبلی شما در حال بررسی است.\nلطفاً منتظر پاسخ پشتیبانی بمانید."
+                )
+    
+                ticket_mode[uid] = False
+                return
             
             cur.execute("""
             UPDATE tickets
