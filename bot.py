@@ -88,6 +88,7 @@ unban_mode = {}
 support_message = {}
 continue_chat = {}
 receipt_mode = {}
+confirm_clear_panel = {}
 # ---------------- BAN ----------------
 def is_banned(uid):
     cur.execute("SELECT 1 FROM banned WHERE user_id=?", (uid,))
@@ -252,6 +253,25 @@ async def callback(update: Update, context):
         )
     
         return
+    if q.data == "confirm_clear_yes":
+        if uid not in ADMIN_IDS:
+            return
+    
+        cur.execute("DELETE FROM tickets")
+        cur.execute("DELETE FROM receipts")
+        db.commit()
+    
+        confirm_clear_panel.pop(uid, None)
+    
+        await q.edit_message_text("✅ گزارش پنل با موفقیت پاک شد.")
+        return
+    
+    
+    if q.data == "confirm_clear_no":
+        confirm_clear_panel.pop(uid, None)
+    
+        await q.message.delete()  # حذف کامل پیام
+        return
     if q.data.startswith("reply_"):
     
         target = int(q.data.split("_")[1])
@@ -387,16 +407,17 @@ async def handle(update: Update, context):
 
         # FIX 1: REPORT ALWAYS WORKS
         if text == "🗑 پاکسازی گزارش پنل":
-
-            cur.execute("DELETE FROM tickets")
-            cur.execute("DELETE FROM receipts")
-        
-            db.commit()
+            confirm_clear_panel[uid] = True
         
             await update.message.reply_text(
-                "✅ گزارش پنل با موفقیت پاک شد."
+                "⚠ آیا از پاکسازی گزارش پنل مطمئن هستید؟",
+                reply_markup=InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("✅ بله، پاک کن", callback_data="confirm_clear_yes"),
+                        InlineKeyboardButton("❌ نه", callback_data="confirm_clear_no"),
+                    ]
+                ])
             )
-        
             return
         if text == "📊 گزارش پنل":
 
