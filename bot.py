@@ -398,6 +398,7 @@ async def handle(update: Update, context):
                     target,
                     f"📩 پاسخ پشتیبانی:\n\n{text}"
                 )
+                ticket_mode[target] = True
         
             cur.execute("""
             UPDATE tickets
@@ -463,6 +464,49 @@ async def handle(update: Update, context):
                 [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
             ])
         )
+        return
+    cur.execute("""
+        SELECT id
+        FROM tickets
+        WHERE user_id=? AND status='open'
+        ORDER BY id DESC
+        LIMIT 1
+        """, (uid,))
+        
+        ticket = cur.fetchone()
+        
+        # اگر تیکت باز دارد، بدون نیاز به زدن دکمه، پیام به همان تیکت اضافه شود
+        if ticket and text not in ["👤 پروفایل من", "📞 تماس با پشتیبانی", "📜 قوانین"]:
+        
+            tid = ticket[0]
+        
+            cur.execute("""
+            UPDATE tickets
+            SET message = message || '\n\n' || ?
+            WHERE id=?
+            """, (text or caption, tid))
+        
+            cur.execute("""
+            UPDATE tickets
+            SET waiting_admin=1
+            WHERE id=?
+            """, (tid,))
+        
+            db.commit()
+        
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+            ])
+        
+            for admin in ADMIN_IDS:
+                await context.bot.send_message(
+                    admin,
+                    f"📨 پیام جدید برای تیکت #{tid}\n\n{text or caption}",
+                    reply_markup=keyboard
+                )
+        
         return
 
     if ticket_mode.get(uid):
