@@ -162,16 +162,18 @@ async def callback(update: Update, context):
         return
 
     if q.data == "start_ticket":
+    
         cur.execute(
-        "SELECT id FROM tickets WHERE user_id=? AND status='open'",
-        (uid,)
+            "SELECT id FROM tickets WHERE user_id=? AND status='open'",
+            (uid,)
         )
-
-    if cur.fetchone():
-        await q.message.reply_text(
-            "❌ شما یک تیکت باز دارید."
-        )
-        return
+    
+        ticket = cur.fetchone()
+    
+        if ticket:
+            await q.message.reply_text("❌ شما یک تیکت باز دارید.")
+            return
+    
         ticket_mode[uid] = True
         await q.message.reply_text("✍ پیام خود را ارسال کنید")
         return
