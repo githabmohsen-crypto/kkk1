@@ -493,6 +493,27 @@ async def handle(update: Update, context):
         )
     
         return
+    if receipt_mode.get(uid):
+
+        if not photo:
+    
+            await update.message.reply_text(
+                "❌ لطفاً فقط تصویر رسید را ارسال کنید."
+            )
+    
+            return
+        cur.execute("""
+        SELECT id
+        FROM tickets
+        WHERE user_id=? AND status='open'
+        ORDER BY id DESC
+        LIMIT 1
+        """, (uid,))
+        
+        row = cur.fetchone()
+        
+        tid = row[0] if row else 0
+        username = update.effective_user.username or "ندارد"
         
 
     if text == "📞 تماس با پشتیبانی":
@@ -572,27 +593,7 @@ async def handle(update: Update, context):
                 "لطفاً تا دریافت پاسخ، از ارسال پیام جدید خودداری کنید."
             )
             return
-    if receipt_mode.get(uid):
 
-        if not photo:
-    
-            await update.message.reply_text(
-                "❌ لطفاً فقط تصویر رسید را ارسال کنید."
-            )
-    
-            return
-        cur.execute("""
-        SELECT id
-        FROM tickets
-        WHERE user_id=? AND status='open'
-        ORDER BY id DESC
-        LIMIT 1
-        """, (uid,))
-        
-        row = cur.fetchone()
-        
-        tid = row[0] if row else 0
-        username = update.effective_user.username or "ندارد"
         for admin in ADMIN_IDS:
     
             await context.bot.send_photo(
@@ -666,16 +667,6 @@ async def handle(update: Update, context):
         
         ticket = cur.fetchone()
         
-        if ticket:
-        
-            tid, waiting = ticket
-        
-            if waiting == 1:
-                await update.message.reply_text(
-                    "⏳ تیکت قبلی شما در حال بررسی است.\nلطفاً منتظر پاسخ پشتیبانی بمانید."
-                )
-                ticket_mode[uid] = False
-                return
         
             cur.execute("""
             UPDATE tickets
