@@ -291,11 +291,11 @@ async def handle(update: Update, context):
                 await update.message.reply_text("لیست بن خالی است")
                 return
         
-            banned_list = "\n".join([str(r[0]) for r in rows])
-        
-            await update.message.reply_text(
-                f"🚫 کاربران بن شده:\n\n{banned_list}"
-            )
+                banned_list = "\n".join([str(r[0]) for r in rows])
+            
+                await update.message.reply_text(
+                    f"🚫 کاربران بن شده:\n\n{banned_list}"
+                )
             return
             if q.data.startswith("unban_"):
                 target = int(q.data.split("_")[1])
@@ -305,7 +305,7 @@ async def handle(update: Update, context):
             
                 await q.answer("رفع بن شد")
                 await q.edit_message_text("✅ کاربر از بن خارج شد")
-                return
+            return
 
         # FIX 1: REPORT ALWAYS WORKS
         if text == "📊 گزارش پنل":
