@@ -249,6 +249,12 @@ async def callback(update: Update, context):
         )
     
         db.commit()
+
+        await context.bot.send_message(
+            user_id,
+            " ",
+            reply_markup=user_menu(user_id)
+        )
     
         await q.edit_message_text("✔ بسته شد")
     
@@ -436,6 +442,11 @@ async def handle(update: Update, context):
                     target,
                     f"📩 پاسخ پشتیبانی:\n\n{text}"
                 )
+                await context.bot.send_message(
+                    target,
+                    " ",
+                    reply_markup=user_menu(target)
+                )
                 ticket_mode[target] = True
         
             cur.execute("""
@@ -606,6 +617,11 @@ async def handle(update: Update, context):
                     "⏳ تیکت قبلی شما در حال بررسی است.\nلطفاً منتظر پاسخ پشتیبانی بمانید."
                 )
                 ticket_mode[uid] = False
+
+            await update.message.reply_text(
+                "💬 گفتگو آغاز شد.",
+                reply_markup=user_menu(uid)
+            )
                 return
         
             cur.execute("""
