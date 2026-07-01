@@ -581,13 +581,29 @@ async def handle(update: Update, context):
             )
     
             return
+        cur.execute("""
+        SELECT id
+        FROM tickets
+        WHERE user_id=? AND status='open'
+        ORDER BY id DESC
+        LIMIT 1
+        """, (uid,))
+        
+        row = cur.fetchone()
+        
+        tid = row[0] if row else 0
     
         for admin in ADMIN_IDS:
     
             await context.bot.send_photo(
                 admin,
                 photo[-1].file_id,
-                caption=f"🧾 رسید جدید\n\n👤 کاربر: {uid}"
+                caption=f"🧾 رسید جدید\n\n👤 کاربر: {uid}",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                    [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+                ])
             )
     
         await update.message.reply_text(
