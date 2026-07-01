@@ -637,6 +637,7 @@ if ticket_mode.get(uid):
     return
     
             # ساخت تیکت جدید
+            # ساخت تیکت جدید
             cur.execute("""
                 INSERT INTO tickets(user_id, username, message, status, created, waiting_admin)
                 VALUES (?, ?, ?, 'open', ?, 1)
@@ -646,46 +647,25 @@ if ticket_mode.get(uid):
                 text or caption,
                 int(time.time())
             ))
-    
+
             db.commit()
-    
+
             tid = cur.lastrowid
-    
+
             cur.execute("""
                 UPDATE profiles
                 SET tickets_count = tickets_count + 1
                 WHERE user_id=?
             """, (uid,))
             db.commit()
-    
+
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
                 [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
                 [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
             ])
-    
-            for admin in ADMIN_IDS:
-    
-                if photo:
-                    await context.bot.send_photo(
-                        admin,
-                        photo[-1].file_id,
-                        caption=f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {caption or ''}",
-                        reply_markup=keyboard
-                    )
-                else:
-                    await context.bot.send_message(
-                        admin,
-                        f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {text}",
-                        reply_markup=keyboard
-                    )
-    
-            await update.message.reply_text(
-                "✅ تیکت شما با موفقیت ثبت شد.\n\n"
-                "در اولین فرصت توسط پشتیبانی بررسی خواهد شد."
-            )
-    
-            return
+
+            ...
 async def unban_cmd(update: Update, context):
 
     if update.effective_user.id not in ADMIN_IDS:
