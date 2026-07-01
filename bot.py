@@ -196,7 +196,7 @@ async def callback(update: Update, context):
     
         await q.message.reply_text("✉ پاسخ را بنویس")
     
-    return
+        return
 
     if q.data.startswith("close_"):
     
