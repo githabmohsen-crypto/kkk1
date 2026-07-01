@@ -177,7 +177,9 @@ async def callback(update: Update, context):
         ticket = cur.fetchone()
     
         if ticket:
-            await q.message.reply_text("❌ شما یک تیکت باز دارید می توانید اکنون پیام خود را بنویسید. ")
+            await q.message.reply_text(
+                "📩 شما در حال حاضر یک تیکت فعال دارید.\n\n"
+                "در صورتی که پیام قبلی شما توسط پشتیبانی پاسخ داده شده باشد، می‌توانید اکنون پیام جدید خود را ارسال کنید.")
             return
     
         ticket_mode[uid] = True
