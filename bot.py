@@ -196,36 +196,62 @@ async def callback(update: Update, context):
 
     if q.data == "start_ticket":
     
-        cur.execute(
-            "SELECT id FROM tickets WHERE user_id=? AND status='open'",
-            (uid,)
-        )
+        cur.execute("""
+            SELECT waiting_admin
+            FROM tickets
+            WHERE user_id=? AND status='open'
+            ORDER BY id DESC
+            LIMIT 1
+        """, (uid,))
     
         ticket = cur.fetchone()
     
         if ticket:
-            await q.message.reply_text("❌ . شما یک تیکت باز دارید می توانید اکنون پیام خود را بنویسید. ")
+    
+            waiting = ticket[0]
+    
+            ticket_mode[uid] = True
+    
+            if waiting == 1:
+                await q.message.reply_text(
+                    "✍ پیام خود را بنویسید.\n\n"
+                    "⛔ تا زمانی که این پیام بررسی نشود امکان ارسال پیام بعدی وجود ندارد."
+                )
+            else:
+                await q.message.reply_text(
+                    "✍ پیام جدید خود را ارسال کنید."
+                )
+    
             return
     
         ticket_mode[uid] = True
-        await q.message.reply_text("✍ پیام خود را ارسال کنید")
+    
+        await q.message.reply_text(
+            "✍ پیام خود را ارسال کنید."
+        )
+    
         return
-
     if q.data.startswith("reply_"):
     
         target = int(q.data.split("_")[1])
     
         reply_mode[uid] = target
     
+        try:
+            await q.edit_message_reply_markup(reply_markup=None)
+        except:
+            pass
+    
         await context.bot.send_message(
             target,
             "👨‍💻 کارشناس در حال پاسخگویی به پیام شما..."
         )
     
-        await q.message.reply_text("✉ پاسخ را بنویس")
+        await q.message.reply_text(
+            "✍ پاسخ خود را ارسال کنید."
+        )
     
         return
-
     if q.data.startswith("close_"):
     
         tid = int(q.data.split("_")[1])
@@ -243,24 +269,31 @@ async def callback(update: Update, context):
     
         user_id = row[0]
     
-        cur.execute(
-            "UPDATE tickets SET status='closed' WHERE id=?",
-            (tid,)
-        )
-    
+        # بستن تیکت
+        cur.execute("""
+            UPDATE tickets
+            SET status='closed'
+            WHERE id=?
+        """, (tid,))
         db.commit()
-
+    
+        # حذف دکمه‌های پیام ادمین
+        try:
+            await q.edit_message_reply_markup(reply_markup=None)
+        except:
+            pass
+    
+        # اطلاع به کاربر + بروزرسانی منو
         await context.bot.send_message(
             user_id,
-            " ",
+            "🙏 تیکت شما بسته شد.",
             reply_markup=user_menu(user_id)
         )
     
-        await q.edit_message_text("✔ بسته شد")
-    
+        # درخواست ثبت رضایت
         await context.bot.send_message(
             user_id,
-            "🙏 تیکت شما بسته شد\n\n⭐ لطفاً میزان رضایت خود را ثبت کنید:",
+            "⭐ لطفاً میزان رضایت خود را ثبت کنید:",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("⭐ عالی", callback_data=f"rate_{tid}_5")],
                 [InlineKeyboardButton("🙂 خوب", callback_data=f"rate_{tid}_4")],
@@ -269,8 +302,8 @@ async def callback(update: Update, context):
             ])
         )
     
+        await q.answer("تیکت بسته شد")
         return
-
     if q.data.startswith("rate_"):
         _, tid, score = q.data.split("_")
         cur.execute("UPDATE tickets SET rating=? WHERE id=?", (int(score), tid))
@@ -427,44 +460,41 @@ async def handle(update: Update, context):
             await update.message.reply_text("✅ ارسال شد")
             return
 
-        if uid in reply_mode:
-        
-            target = reply_mode[uid]
-        
-            # اول وضعیت تیکت را تغییر بده
-            cur.execute("""
+    if uid in reply_mode:
+    
+        target = reply_mode[uid]
+    
+        # اول وضعیت تیکت تغییر کند
+        cur.execute("""
             UPDATE tickets
             SET waiting_admin=0
             WHERE user_id=? AND status='open'
-            """, (target,))
-            db.commit()
-        
-            if photo:
-                await context.bot.send_photo(
-                    target,
-                    photo[-1].file_id,
-                    caption=caption or ""
-                )
-            else:
-                await context.bot.send_message(
-                    target,
-                    f"📩 پاسخ پشتیبانی:\n\n{text}"
-                )
-        
-            # حالا کیبورد را بروزرسانی کن
+        """, (target,))
+        db.commit()
+    
+        if photo:
+            await context.bot.send_photo(
+                target,
+                photo[-1].file_id,
+                caption=caption or ""
+            )
+        else:
             await context.bot.send_message(
                 target,
-                "💬 می‌توانید پاسخ خود را ارسال کنید.",
-                reply_markup=user_menu(target)
+                f"📩 پاسخ پشتیبانی:\n\n{text}"
             )
-        
-            ticket_mode[target] = True
-        
-            await update.message.reply_text("✅ ارسال شد")
-        
-            del reply_mode[uid]
-            return
-
+    
+        # بروزرسانی منوی کاربر
+        await context.bot.send_message(
+            target,
+            "💬 اکنون می‌توانید پیام بعدی خود را ارسال کنید.",
+            reply_markup=user_menu(target)
+        )
+    
+        await update.message.reply_text("✅ پاسخ ارسال شد.")
+    
+        del reply_mode[uid]
+        return
     # ---------------- USER ----------------
     if text == "👤 پروفایل من":
 
@@ -527,45 +557,81 @@ async def handle(update: Update, context):
     
         support_message[uid] = msg.message_id
         return
+        if ticket_mode.get(uid):
     
-        username = update.effective_user.username or "ندارد"
+            ticket_mode[uid] = False
     
-        cur.execute("""
-            SELECT id, waiting_admin
-            FROM tickets
-            WHERE user_id=? AND status='open'
-            ORDER BY id DESC
-            LIMIT 1
-        """, (uid,))
+            username = update.effective_user.username or "ندارد"
     
-        ticket = cur.fetchone()
+            cur.execute("""
+                SELECT id, waiting_admin
+                FROM tickets
+                WHERE user_id=? AND status='open'
+                ORDER BY id DESC
+                LIMIT 1
+            """, (uid,))
     
-        # اگر تیکت باز وجود دارد
-        if ticket:
+            ticket = cur.fetchone()
     
-            tid, waiting = ticket
+            # اگر تیکت باز وجود دارد
+            if ticket:
     
-            if waiting == 1:
-                await update.message.reply_text(
-                    "⏳ تیکت قبلی شما در حال بررسی است.\n"
-                    "لطفاً منتظر پاسخ پشتیبانی بمانید."
-                )
-                ticket_mode[uid] = False
+                tid, waiting = ticket
+    
+                # هنوز ادمین پاسخ نداده
+                if waiting == 1:
+                    await update.message.reply_text(
+                        "⏳ پیام قبلی شما هنوز بررسی نشده است.\n"
+                        "لطفاً منتظر پاسخ پشتیبانی بمانید."
+                    )
+                    return
+    
+                # افزودن پیام جدید
+                cur.execute("""
+                    UPDATE tickets
+                    SET message = message || '\n\n' || ?,
+                        waiting_admin = 1
+                    WHERE id=?
+                """, (text or caption, tid))
+    
+                db.commit()
+    
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                    [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+                ])
+    
+                for admin in ADMIN_IDS:
+                    await context.bot.send_message(
+                        admin,
+                        f"📨 پیام جدید برای تیکت #{tid}\n\n{text or caption}",
+                        reply_markup=keyboard
+                    )
+    
+                await update.message.reply_text("✅ پیام شما ارسال شد.")
                 return
     
-            # افزودن پیام به تیکت قبلی
+            # ساخت تیکت جدید
             cur.execute("""
-                UPDATE tickets
-                SET message = message || '\n\n' || ?
-                WHERE id=?
-            """, (text or caption, tid))
+                INSERT INTO tickets(user_id, username, message, status, created, waiting_admin)
+                VALUES (?, ?, ?, 'open', ?, 1)
+            """, (
+                uid,
+                username,
+                text or caption,
+                int(time.time())
+            ))
+    
+            db.commit()
+    
+            tid = cur.lastrowid
     
             cur.execute("""
-                UPDATE tickets
-                SET waiting_admin=1
-                WHERE id=?
-            """, (tid,))
-    
+                UPDATE profiles
+                SET tickets_count = tickets_count + 1
+                WHERE user_id=?
+            """, (uid,))
             db.commit()
     
             keyboard = InlineKeyboardMarkup([
@@ -575,109 +641,27 @@ async def handle(update: Update, context):
             ])
     
             for admin in ADMIN_IDS:
-                await context.bot.send_message(
-                    admin,
-                    f"📨 پیام جدید برای تیکت #{tid}\n\n{text or caption}",
-                    reply_markup=keyboard
-                )
     
-            await update.message.reply_text("✅ پیام شما ارسال شد.")
+                if photo:
+                    await context.bot.send_photo(
+                        admin,
+                        photo[-1].file_id,
+                        caption=f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {caption or ''}",
+                        reply_markup=keyboard
+                    )
+                else:
+                    await context.bot.send_message(
+                        admin,
+                        f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {text}",
+                        reply_markup=keyboard
+                    )
     
-            ticket_mode[uid] = False
-            return
-    
-        # اگر تیکت باز ندارد، تیکت جدید بساز
-        cur.execute("""
-            INSERT INTO tickets(user_id, username, message, status, created, waiting_admin)
-            VALUES (?, ?, ?, ?, ?, 1)
-        """, (uid, username, text or caption, "open", int(time.time())))
-    
-        db.commit()
-    
-        tid = cur.lastrowid
-    
-        cur.execute("""
-            UPDATE profiles
-            SET tickets_count = tickets_count + 1
-            WHERE user_id=?
-        """, (uid,))
-    
-        db.commit()
-    
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-            [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-            [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
-        ])
-    
-        for admin in ADMIN_IDS:
-            if photo:
-                await context.bot.send_photo(
-                    admin,
-                    photo[-1].file_id,
-                    caption=f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {caption or ''}",
-                    reply_markup=keyboard
-                )
-            else:
-                await context.bot.send_message(
-                    admin,
-                    f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {text}",
-                    reply_markup=keyboard
-                )
-    
-        await update.message.reply_text(
-            "✅ تیکت شما با موفقیت ثبت شد."
-        )
-    
-        ticket_mode[uid] = False
-        return
-        cur.execute("""
-        INSERT INTO tickets(user_id, username, message, status, created, waiting_admin)
-        VALUES (?, ?, ?, ?, ?, 1)
-        """, (uid, username, text or caption, "open", int(time.time())))
-        db.commit()
-    
-        tid = cur.lastrowid
-    
-        cur.execute("UPDATE profiles SET tickets_count = tickets_count + 1 WHERE user_id=?", (uid,))
-        db.commit()
-    
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-            [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-            [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")],
-            [InlineKeyboardButton("✅ رفع بن", callback_data=f"unban_{uid}")]
-        ])
-    
-        for admin in ADMIN_IDS:
-            if photo:
-                await context.bot.send_photo(
-                    admin,
-                    photo[-1].file_id,
-                    caption=f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {caption or ''}",
-                    reply_markup=keyboard
-                )
-            else:
-                await context.bot.send_message(
-                    admin,
-                    f"🎫 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {text}",
-                    reply_markup=keyboard
-                )
-    
-        await update.message.reply_text(
-            "تیکت شما به واحد پشتیبانی ارسال شد ✅️\n\n"
-
-            "1️⃣ درخواست شما در صف بررسی تیم پشتیبانی قرار گرفت و در اولین فرصت پاسخ داده خواهد شد.\n\n"
-            
-            "2️⃣ لطفاً از ارسال پیام‌های تکراری یا اسپم خودداری کنید تا روند رسیدگی سریع‌تر انجام شود.\n\n"
-            
-            "3️⃣ زمان پاسخ‌دهی ممکن است بسته به حجم درخواست‌ها متفاوت باشد.\n\n"
-            
-            "💙 از صبوری و همراهی شما سپاسگزاریم."
+            await update.message.reply_text(
+                "✅ تیکت شما با موفقیت ثبت شد.\n\n"
+                "در اولین فرصت توسط پشتیبانی بررسی خواهد شد."
             )
-            
-        ticket_mode[uid] = False
-        return
+    
+            return
 async def unban_cmd(update: Update, context):
 
     if update.effective_user.id not in ADMIN_IDS:
