@@ -75,6 +75,7 @@ reply_mode = {}
 broadcast_mode = {}
 unban_mode = {}
 support_message = {}
+continue_chat = {}
 # ---------------- BAN ----------------
 def is_banned(uid):
     cur.execute("SELECT 1 FROM banned WHERE user_id=?", (uid,))
@@ -182,7 +183,24 @@ async def callback(update: Update, context):
         ticket_mode[uid] = True
         await q.message.reply_text("✍ پیام خود را ارسال کنید")
         return
+        if q.data == "continue_chat":
 
+    continue_chat[uid] = True
+
+    await q.message.reply_text(
+        "✍ پیام خود را برای ادامه گفتگو ارسال کنید."
+    )
+
+        return
+    if q.data == "continue_chat":
+    
+        continue_chat[uid] = True
+    
+        await q.message.reply_text(
+            "✍ پیام خود را برای ادامه گفتگو ارسال کنید."
+        )
+    
+        return
     if q.data.startswith("reply_"):
     
         target = int(q.data.split("_")[1])
@@ -406,10 +424,18 @@ async def handle(update: Update, context):
             else:
                 await context.bot.send_message(
                     target,
-                    f"📩 پاسخ پشتیبانی:\n\n{text}"
+                    f"📩 پاسخ پشتیبانی:\n\n{text}",
+                    reply_markup=InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton(
+                                "🔄 ادامه گفتگو با ادمین",
+                                callback_data="continue_chat"
+                            )
+                        ]
+                    ])
                 )
-                ticket_mode[target] = True
         
+                ticket_mode[target] = True
             cur.execute("""
             UPDATE tickets
             SET waiting_admin=0
@@ -505,6 +531,13 @@ async def handle(update: Update, context):
     ticket = cur.fetchone()
 
     if ticket and text not in ["👤 پروفایل من", "📞 تماس با پشتیبانی", "📜 قوانین"]:
+        if not continue_chat.get(uid):
+        
+            await update.message.reply_text(
+                "برای ارسال پیام جدید ابتدا روی دکمه «🔄 ادامه گفتگو با ادمین» بزنید."
+            )
+        
+            return
 
         tid, waiting = ticket
 
