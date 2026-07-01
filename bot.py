@@ -713,23 +713,19 @@ async def handle(update: Update, context):
     LIMIT 1
     """, (uid,))
 
-    ticket = cur.fetchone()
-    if ticket and text not in [
-        "👤 پروفایل من",
-        "📞 تماس با پشتیبانی",
-        "📜 قوانین"
-    ]:
-
+    if ticket:
         tid, waiting = ticket
     
-        if waiting == 1 and not continue_chat.get(uid):
+        if continue_chat.get(uid):
+            continue_chat[uid] = False  # فقط یک بار اجازه ادامه
     
-            await update.message.reply_text(
-                "⏳ پیام قبلی شما در حال بررسی توسط پشتیبانی است.\n\n"
-                "لطفاً تا زمان پاسخگویی منتظر بمانید."
-            )
-    
-            return
+        else:
+            if waiting == 1:
+                await update.message.reply_text(
+                    "⏳ پیام قبلی شما هنوز توسط پشتیبانی پاسخ داده نشده است.\n"
+                    "برای ادامه گفتگو روی «🔄 ادامه گفتگو» بزنید."
+                )
+                return
 
     if ticket and text not in ["👤 پروفایل من", "📞 تماس با پشتیبانی", "📜 قوانین"]:
     
