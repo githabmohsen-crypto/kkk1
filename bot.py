@@ -835,49 +835,38 @@ async def handle(update: Update, context):
     
         ticket = cur.fetchone()
     
-        if ticket:
-    
+        if ticket and continue_chat.get(uid):
             tid, waiting = ticket
-    
-            if waiting == 1:
-    
-                await update.message.reply_text(
-                    "⏳ تیکت قبلی شما در حال بررسی است.\nلطفاً منتظر پاسخ پشتیبانی بمانید."
-                )
-    
-                ticket_mode[uid] = False
-                return
-            
+        
             cur.execute("""
-            UPDATE tickets
-            SET message = message || '\n\n' || ?
-            WHERE id=?
+                UPDATE tickets
+                SET message = message || '\n\n' || ?
+                WHERE id=?
             """, (text or caption, tid))
         
             cur.execute("""
-            UPDATE tickets
-            SET waiting_admin=1
-            WHERE id=?
+                UPDATE tickets
+                SET waiting_admin=1
+                WHERE id=?
             """, (tid,))
         
             db.commit()
         
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-                [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-                [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
-            ])
-        
             for admin in ADMIN_IDS:
                 await context.bot.send_message(
                     admin,
-                    f"📨 پیام جدید برای تیکت #{tid}\n\n{text or caption}",
-                    reply_markup=keyboard
+                    f"📨 پیام ادامه گفتگو (تیکت #{tid})\n\n{text or caption}",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                        [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                        [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+                    ])
                 )
         
-            await update.message.reply_text(
-                "پیام شما به تیکت قبلی اضافه شد ✅"
-            )
+            await update.message.reply_text("✅ پیام شما ارسال شد")
+        
+            continue_chat.pop(uid, None)
+            return
         
             ticket_mode[uid] = False
             return
