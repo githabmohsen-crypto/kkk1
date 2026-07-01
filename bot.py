@@ -128,7 +128,7 @@ def user_menu():
 
 def admin_menu():
     return ReplyKeyboardMarkup(
-        [["📋 تیکت‌های باز"], ["📊 گزارش پنل"], ["📣 ارسال همگانی"], ["🚫 مدیریت بن"]],
+        [["📋 تیکت‌های باز"], ["📊 گزارش پنل"], ["📣 ارسال همگانی"], ["✅ رفع افراد مسدود شده"]],
         resize_keyboard=True
     )
 
@@ -301,7 +301,7 @@ async def handle(update: Update, context):
             broadcast_mode[uid] = True
             await update.message.reply_text("✍ پیام همگانی را ارسال کنید")
             return
-        if text == "🚫 مدیریت بن":
+        if text == "✅ رفع افراد مسدود شده":
             unban_mode[uid] = True
             await update.message.reply_text("✍ آیدی عددی کاربر را ارسال کنید")
             return
@@ -648,7 +648,6 @@ async def handle(update: Update, context):
             [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
             [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
             [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")],
-            [InlineKeyboardButton("✅ رفع بن", callback_data=f"unban_{uid}")]
         ])
     
         for admin in ADMIN_IDS:
