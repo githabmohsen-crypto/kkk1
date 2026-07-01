@@ -469,13 +469,13 @@ async def handle(update: Update, context):
     
         username = update.effective_user.username or "ندارد"
         
-    cur.execute("""
-        SELECT id, waiting_admin
-        FROM tickets
-        WHERE user_id=? AND status='open'
-        ORDER BY id DESC
-        LIMIT 1
-        """, (uid,))
+        cur.execute("""
+            SELECT id, waiting_admin
+            FROM tickets
+            WHERE user_id=? AND status='open'
+            ORDER BY id DESC
+            LIMIT 1
+            """, (uid,))
         
         ticket = cur.fetchone()
         
