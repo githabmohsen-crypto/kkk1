@@ -88,7 +88,6 @@ unban_mode = {}
 support_message = {}
 continue_chat = {}
 receipt_mode = {}
-confirm_clear_panel = {}
 # ---------------- BAN ----------------
 def is_banned(uid):
     cur.execute("SELECT 1 FROM banned WHERE user_id=?", (uid,))
@@ -141,13 +140,7 @@ def user_menu():
 
 def admin_menu():
     return ReplyKeyboardMarkup(
-        [
-            ["📋 تیکت‌های باز"],
-            ["📊 گزارش پنل"],
-            ["📣 ارسال همگانی"],
-            ["✅ رفع افراد مسدود شده"],
-            ["🗑 پاکسازی گزارش پنل"]
-        ],
+        [["📋 تیکت‌های باز"], ["📊 گزارش پنل"], ["📣 ارسال همگانی"], ["✅ رفع افراد مسدود شده"]],
         resize_keyboard=True
     )
 
@@ -252,25 +245,6 @@ async def callback(update: Update, context):
             ])
         )
     
-        return
-    if q.data == "confirm_clear_yes":
-        if uid not in ADMIN_IDS:
-            return
-    
-        cur.execute("DELETE FROM tickets")
-        cur.execute("DELETE FROM receipts")
-        db.commit()
-    
-        confirm_clear_panel.pop(uid, None)
-    
-        await q.edit_message_text("✅ گزارش پنل با موفقیت پاک شد.")
-        return
-    
-    
-    if q.data == "confirm_clear_no":
-        confirm_clear_panel.pop(uid, None)
-    
-        await q.message.delete()  # حذف کامل پیام
         return
     if q.data.startswith("reply_"):
     
@@ -406,19 +380,6 @@ async def handle(update: Update, context):
                 return
 
         # FIX 1: REPORT ALWAYS WORKS
-        if text == "🗑 پاکسازی گزارش پنل":
-            confirm_clear_panel[uid] = True
-        
-            await update.message.reply_text(
-                "⚠ آیا از پاکسازی گزارش پنل مطمئن هستید؟",
-                reply_markup=InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("✅ بله، پاک کن", callback_data="confirm_clear_yes"),
-                        InlineKeyboardButton("❌ نه", callback_data="confirm_clear_no"),
-                    ]
-                ])
-            )
-            return
         if text == "📊 گزارش پنل":
 
             cur.execute("SELECT COUNT(*) FROM users")
@@ -524,6 +485,42 @@ async def handle(update: Update, context):
         
             broadcast_mode[uid] = False
             await update.message.reply_text("✅ ارسال شد")
+            return
+
+        if uid in reply_mode:
+        
+            target = reply_mode[uid]
+        
+            if photo:
+                await context.bot.send_photo(
+                    target,
+                    photo[-1].file_id,
+                    caption=caption or ""
+                )
+            else:
+                await context.bot.send_message(
+                    target,
+                    f"📩 پاسخ پشتیبانی:\n\n{text}",
+                    reply_markup=InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton(
+                                "🔄 ادامه گفتگو با ادمین",
+                                callback_data="continue_chat"
+                            )
+                        ]
+                    ])
+                )
+        
+                ticket_mode[target] = True
+            cur.execute("""
+            UPDATE tickets
+            SET waiting_admin=0
+            WHERE user_id=? AND status='open'
+            """, (target,))
+            db.commit()
+        
+            await update.message.reply_text("✅ ارسال شد")
+            del reply_mode[uid]
             return
         if uid in ADMIN_IDS and unban_mode.get(uid):
     
@@ -799,38 +796,49 @@ async def handle(update: Update, context):
     
         ticket = cur.fetchone()
     
-        if ticket and continue_chat.get(uid):
+        if ticket:
+    
             tid, waiting = ticket
-        
+    
+            if waiting == 1:
+    
+                await update.message.reply_text(
+                    "⏳ تیکت قبلی شما در حال بررسی است.\nلطفاً منتظر پاسخ پشتیبانی بمانید."
+                )
+    
+                ticket_mode[uid] = False
+                return
+            
             cur.execute("""
-                UPDATE tickets
-                SET message = message || '\n\n' || ?
-                WHERE id=?
+            UPDATE tickets
+            SET message = message || '\n\n' || ?
+            WHERE id=?
             """, (text or caption, tid))
         
             cur.execute("""
-                UPDATE tickets
-                SET waiting_admin=1
-                WHERE id=?
+            UPDATE tickets
+            SET waiting_admin=1
+            WHERE id=?
             """, (tid,))
         
             db.commit()
         
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+            ])
+        
             for admin in ADMIN_IDS:
                 await context.bot.send_message(
                     admin,
-                    f"📨 پیام ادامه گفتگو (تیکت #{tid})\n\n{text or caption}",
-                    reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-                        [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-                        [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
-                    ])
+                    f"📨 پیام جدید برای تیکت #{tid}\n\n{text or caption}",
+                    reply_markup=keyboard
                 )
         
-            await update.message.reply_text("✅ پیام شما ارسال شد")
-        
-            continue_chat.pop(uid, None)
-            return
+            await update.message.reply_text(
+                "پیام شما به تیکت قبلی اضافه شد ✅"
+            )
         
             ticket_mode[uid] = False
             return
@@ -868,49 +876,18 @@ async def handle(update: Update, context):
     
         await update.message.reply_text(
             "تیکت شما به واحد پشتیبانی ارسال شد ✅️\n\n"
+
             "1️⃣ درخواست شما در صف بررسی تیم پشتیبانی قرار گرفت و در اولین فرصت پاسخ داده خواهد شد.\n\n"
+            
             "2️⃣ لطفاً از ارسال پیام‌های تکراری یا اسپم خودداری کنید تا روند رسیدگی سریع‌تر انجام شود.\n\n"
+            
             "3️⃣ زمان پاسخ‌دهی ممکن است بسته به حجم درخواست‌ها متفاوت باشد.\n\n"
+            
             "💙 از صبوری و همراهی شما سپاسگزاریم."
-        )
-        
+            )
+            
         ticket_mode[uid] = False
         return
-        
-        
-        if uid in reply_mode:
-        
-            target = reply_mode[uid]
-        
-            if photo:
-                await context.bot.send_photo(
-                    target,
-                    photo[-1].file_id,
-                    caption=caption or ""
-                )
-            else:
-                await context.bot.send_message(
-                    target,
-                    f"📩 پاسخ پشتیبانی:\n\n{text}",
-                    reply_markup=InlineKeyboardMarkup([
-                        [
-                            InlineKeyboardButton(
-                                "🔄 ادامه گفتگو با ادمین",
-                                callback_data="continue_chat"
-                            )
-                        ]
-                    ])
-                )
-        
-            ticket_mode[target] = True
-        
-            cur.execute("""
-                UPDATE tickets
-                SET waiting_admin=0
-                WHERE user_id=? AND status='open'
-            """, (target,))
-        
-            db.commit()      
 async def unban_cmd(update: Update, context):
 
     if update.effective_user.id not in ADMIN_IDS:
