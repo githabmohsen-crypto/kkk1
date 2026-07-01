@@ -716,16 +716,15 @@ async def handle(update: Update, context):
     if ticket:
         tid, waiting = ticket
     
-        if continue_chat.get(uid):
-            continue_chat[uid] = False  # فقط یک بار اجازه ادامه
+        # اگر کاربر اجازه ادامه گرفته
+        can_continue = continue_chat.pop(uid, False)
     
-        else:
-            if waiting == 1:
-                await update.message.reply_text(
-                    "⏳ پیام قبلی شما هنوز توسط پشتیبانی پاسخ داده نشده است.\n"
-                    "برای ادامه گفتگو روی «🔄 ادامه گفتگو» بزنید."
-                )
-                return
+        if waiting == 1 and not can_continue:
+            await update.message.reply_text(
+                "⏳ پیام قبلی شما هنوز پاسخ داده نشده.\n"
+                "برای ادامه گفتگو روی دکمه «ادامه گفتگو» بزنید."
+            )
+            return
 
     if ticket and text not in ["👤 پروفایل من", "📞 تماس با پشتیبانی", "📜 قوانین"]:
     
