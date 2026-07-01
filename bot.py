@@ -76,6 +76,7 @@ broadcast_mode = {}
 unban_mode = {}
 support_message = {}
 continue_chat = {}
+receipt_mode = {}
 # ---------------- BAN ----------------
 def is_banned(uid):
     cur.execute("SELECT 1 FROM banned WHERE user_id=?", (uid,))
@@ -122,7 +123,7 @@ async def enforce_channel(update, context):
 # ---------------- MENUS ----------------
 def user_menu():
     return ReplyKeyboardMarkup(
-        [["👤 پروفایل من"], ["📞 تماس با پشتیبانی"], ["📜 قوانین"]],
+        [["👤 پروفایل من"], ["📞 تماس با پشتیبانی"], ["📜 قوانین"], ["📨 ارسال رسید"]],
         resize_keyboard=True
     )
 
@@ -483,6 +484,16 @@ async def handle(update: Update, context):
             "💙 با استفاده از ربات قوانین را پذیرفته‌اید"
         )
         return
+    if text == "📨 ارسال رسید":
+    
+        receipt_mode[uid] = True
+    
+        await update.message.reply_text(
+            "📷 لطفاً تصویر رسید خود را ارسال کنید."
+        )
+    
+        return
+        
 
     if text == "📞 تماس با پشتیبانی":
 # اگر پیام قبلی وجود دارد حذفش کن
@@ -550,6 +561,7 @@ async def handle(update: Update, context):
             )
         
             return
+            
 
         tid, waiting = ticket
 
@@ -560,7 +572,31 @@ async def handle(update: Update, context):
                 "لطفاً تا دریافت پاسخ، از ارسال پیام جدید خودداری کنید."
             )
             return
+    if receipt_mode.get(uid):
 
+        if not photo:
+    
+            await update.message.reply_text(
+                "❌ لطفاً فقط تصویر رسید را ارسال کنید."
+            )
+    
+            return
+    
+        for admin in ADMIN_IDS:
+    
+            await context.bot.send_photo(
+                admin,
+                photo[-1].file_id,
+                caption=f"🧾 رسید جدید\n\n👤 کاربر: {uid}"
+            )
+    
+        await update.message.reply_text(
+            "✅ رسید شما با موفقیت ارسال شد."
+        )
+    
+        receipt_mode.pop(uid)
+    
+        return
         # اضافه کردن پیام جدید به همان تیکت
         cur.execute("""
         UPDATE tickets
