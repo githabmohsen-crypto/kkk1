@@ -183,15 +183,6 @@ async def callback(update: Update, context):
         ticket_mode[uid] = True
         await q.message.reply_text("✍ پیام خود را ارسال کنید")
         return
-        if q.data == "continue_chat":
-
-    continue_chat[uid] = True
-
-    await q.message.reply_text(
-        "✍ پیام خود را برای ادامه گفتگو ارسال کنید."
-    )
-
-        return
     if q.data == "continue_chat":
     
         continue_chat[uid] = True
