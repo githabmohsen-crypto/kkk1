@@ -433,7 +433,7 @@ async def handle(update: Update, context):
         
             del reply_mode[uid]
         
-        return
+            return
         if uid in ADMIN_IDS and unban_mode.get(uid):
     
             target = int(text)
