@@ -188,10 +188,12 @@ async def callback(update: Update, context):
     
         reply_mode[uid] = target
     
-        await context.bot.send_message(
+        msg = await context.bot.send_message(
             target,
             "👨‍💻 کارشناس در حال پاسخگویی به پیام شما..."
         )
+    
+        typing_message[target] = msg.message_id
     
         await q.message.reply_text("✉ پاسخ را بنویس")
     
@@ -407,7 +409,18 @@ async def handle(update: Update, context):
                     target,
                     f"📩 پاسخ پشتیبانی:\n\n{text}"
                 )
-                ticket_mode[target] = True
+        
+            # حذف پیام "در حال پاسخگویی..."
+            if target in typing_message:
+                try:
+                    await context.bot.delete_message(
+                        chat_id=target,
+                        message_id=typing_message[target]
+                    )
+                except:
+                    pass
+        
+                del typing_message[target]
         
             cur.execute("""
             UPDATE tickets
@@ -416,9 +429,11 @@ async def handle(update: Update, context):
             """, (target,))
             db.commit()
         
-            await update.message.reply_text("✅ ارسال شد")
+            await update.message.reply_text("✅ پاسخ ارسال شد")
+        
             del reply_mode[uid]
-            return
+        
+        return
         if uid in ADMIN_IDS and unban_mode.get(uid):
     
             target = int(text)
