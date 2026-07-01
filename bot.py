@@ -523,7 +523,11 @@ async def handle(update: Update, context):
     """, (uid,))
 
     ticket = cur.fetchone()
-    if ticket:
+    if ticket and text not in [
+        "👤 پروفایل من",
+        "📞 تماس با پشتیبانی",
+        "📜 قوانین"
+    ]:
 
         tid, waiting = ticket
     
