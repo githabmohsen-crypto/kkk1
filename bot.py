@@ -455,7 +455,7 @@ async def handle(update: Update, context):
         return
 
     if ticket_mode.get(uid):
-    
+        print("ENTER TICKET")
         username = update.effective_user.username or "ندارد"
     
         cur.execute(
