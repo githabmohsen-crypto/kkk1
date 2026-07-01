@@ -594,7 +594,7 @@ async def handle(update: Update, context):
         receipt_id = cur.lastrowid
     
         for admin in ADMIN_IDS:
-    
+        
             await context.bot.send_photo(
                 admin,
                 photo[-1].file_id,
@@ -620,13 +620,14 @@ async def handle(update: Update, context):
                         InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")
                     ]
                 ])
-    
+            )
+        
         await update.message.reply_text(
             "✅ رسید شما با موفقیت ارسال شد."
         )
-    
+        
         receipt_mode.pop(uid, None)
-    
+        
         return
         
 
