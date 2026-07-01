@@ -471,10 +471,9 @@ async def handle(update: Update, context):
         WHERE user_id=? AND status='open'
         ORDER BY id DESC
         LIMIT 1
-        """, (uid,))
-        
-        ticket = cur.fetchone()
-        
+    """, (uid,))
+
+    ticket = cur.fetchone()
         # اگر تیکت باز دارد، بدون نیاز به زدن دکمه، پیام به همان تیکت اضافه شود
         if ticket and text not in ["👤 پروفایل من", "📞 تماس با پشتیبانی", "📜 قوانین"]:
         
