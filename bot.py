@@ -528,30 +528,30 @@ async def handle(update: Update, context):
         )
         return
     
- if text in [
-    "📞 تماس با پشتیبانی",
-    "🟡 ادامه گفتگو با پشتیبانی",
-    "🔵 ادامه گفتگو با پشتیبانی"
-]:
+    if text in [
+        "📞 تماس با پشتیبانی",
+        "🟡 ادامه گفتگو با پشتیبانی",
+        "🔵 ادامه گفتگو با پشتیبانی"
+    ]:
 
-    if uid in support_message:
-        try:
-            await context.bot.delete_message(
-                chat_id=uid,
-                message_id=support_message[uid]
-            )
-        except:
-            pass
+        if uid in support_message:
+            try:
+                await context.bot.delete_message(
+                    chat_id=uid,
+                    message_id=support_message[uid]
+                )
+            except:
+                pass
 
-    msg = await update.message.reply_text(
-        "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی...",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
-        ])
-    )
+        msg = await update.message.reply_text(
+            "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی...",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
+            ])
+        )
 
-    support_message[uid] = msg.message_id
-    return
+        support_message[uid] = msg.message_id
+        return
 
 if ticket_mode.get(uid):
 
