@@ -512,6 +512,7 @@ async def handle(update: Update, context):
                 )
             except:
                 pass
+        ticket_mode[uid] = True
         
         msg = await update.message.reply_text(
             "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه پایین استفاده کنید.\n\n"
@@ -541,7 +542,13 @@ async def handle(update: Update, context):
 
     ticket = cur.fetchone()
 
-    if ticket and text not in ["👤 پروفایل من", "📞 تماس با پشتیبانی", "📜 قوانین"]:
+if ticket and text not in [
+    "👤 پروفایل من",
+    "📞 تماس با پشتیبانی",
+    "🟡 ادامه گفتگو با پشتیبانی",
+    "🔵 ادامه گفتگو با پشتیبانی",
+    "📜 قوانین"
+]:
 
         tid, waiting = ticket
 
