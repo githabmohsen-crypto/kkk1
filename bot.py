@@ -868,51 +868,49 @@ async def handle(update: Update, context):
     
         await update.message.reply_text(
             "تیکت شما به واحد پشتیبانی ارسال شد ✅️\n\n"
-
             "1️⃣ درخواست شما در صف بررسی تیم پشتیبانی قرار گرفت و در اولین فرصت پاسخ داده خواهد شد.\n\n"
-            
             "2️⃣ لطفاً از ارسال پیام‌های تکراری یا اسپم خودداری کنید تا روند رسیدگی سریع‌تر انجام شود.\n\n"
-            
             "3️⃣ زمان پاسخ‌دهی ممکن است بسته به حجم درخواست‌ها متفاوت باشد.\n\n"
-            
             "💙 از صبوری و همراهی شما سپاسگزاریم."
-            )
-            
+        )
+        
         ticket_mode[uid] = False
         return
-     if uid in reply_mode:
         
-        target = reply_mode[uid]
         
-        if photo:
-            await context.bot.send_photo(
-                target,
-                photo[-1].file_id,
-                caption=caption or ""
-            )
-        else:
-            await context.bot.send_message(
-                target,
-                f"📩 پاسخ پشتیبانی:\n\n{text}",
-                reply_markup=InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton(
-                            "🔄 ادامه گفتگو با ادمین",
-                            callback_data="continue_chat"
-                        )
-                    ]
-                ])
-            )
-    
+        if uid in reply_mode:
+        
+            target = reply_mode[uid]
+        
+            if photo:
+                await context.bot.send_photo(
+                    target,
+                    photo[-1].file_id,
+                    caption=caption or ""
+                )
+            else:
+                await context.bot.send_message(
+                    target,
+                    f"📩 پاسخ پشتیبانی:\n\n{text}",
+                    reply_markup=InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton(
+                                "🔄 ادامه گفتگو با ادمین",
+                                callback_data="continue_chat"
+                            )
+                        ]
+                    ])
+                )
+        
             ticket_mode[target] = True
-    
-        cur.execute("""
-        UPDATE tickets
-        SET waiting_admin=0
-        WHERE user_id=? AND status='open'
-        """, (target,))
-    
-        db.commit()       
+        
+            cur.execute("""
+                UPDATE tickets
+                SET waiting_admin=0
+                WHERE user_id=? AND status='open'
+            """, (target,))
+        
+            db.commit()      
 async def unban_cmd(update: Update, context):
 
     if update.effective_user.id not in ADMIN_IDS:
