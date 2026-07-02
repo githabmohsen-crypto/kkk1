@@ -161,6 +161,13 @@ def receipt_menu():
         ],
         resize_keyboard=True
     )
+def support_menu():
+    return ReplyKeyboardMarkup(
+        [
+            ["🔙 بازگشت"]
+        ],
+        resize_keyboard=True
+    )
 # ---------------- START ----------------
 async def start(update: Update, context):
 
