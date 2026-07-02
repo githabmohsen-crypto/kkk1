@@ -688,7 +688,9 @@ async def handle(update: Update, context):
             return
         if text == "🧾 جستجوی کد کاربر":
             receipt_lookup_mode[uid] = True
-        
+            if text == "🔙 بازگشت":
+                return
+                
             await update.message.reply_text(
                 "👤 یوزرنیم یا آیدی کاربر را وارد کنید",
                 reply_markup=back_menu()
