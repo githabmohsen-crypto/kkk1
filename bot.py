@@ -589,16 +589,22 @@ async def handle(update: Update, context):
             return
         if text == "🔙 بازگشت":
         
-            # پاک کردن همه حالت‌ها
+            # پاک کردن state ها
             broadcast_mode.pop(uid, None)
             receipt_lookup_mode.pop(uid, None)
             ticket_mode.pop(uid, None)
             continue_chat.pop(uid, None)
             unban_mode.pop(uid, None)
         
+            # تشخیص نقش کاربر
+            if uid in ADMIN_IDS:
+                menu = admin_menu()
+            else:
+                menu = user_menu()
+        
             await update.message.reply_text(
-                "🏠 به منوی اصلی برگشتید",
-                reply_markup=user_menu()  # یا admin_menu اگر ادمینه
+                "🔄 به منوی اصلی برگشتید",
+                reply_markup=menu
             )
             return
         if text == "📊 گزارش پنل":
