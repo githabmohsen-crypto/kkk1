@@ -716,19 +716,20 @@ async def handle(update: Update, context):
     
     ticket = cur.fetchone()
     
+    skip_check = text == "📞 تماس با پشتیبانی"
+    
     if ticket:
     
         tid, waiting = ticket
         can_continue = continue_chat.get(uid, False)
     
-        if waiting == 1 and not can_continue:
+        if waiting == 1 and not can_continue and not skip_check:
             await update.message.reply_text(
                 "⏳ کارشناسان در حال بررسی پیام قبلی شما هستند\n\n"
                 "لطفاً تا زمان پاسخگویی کارشناسان صبور باشید.\n"
                 "پس از دریافت پاسخ، می‌توانید پیام جدید خود را ارسال کنید. 🙏"
             )
             return
-    
         message_text = text or caption or "📎 پیام جدید"
     
         cur.execute("""
