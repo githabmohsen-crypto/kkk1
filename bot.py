@@ -99,6 +99,7 @@ unban_mode = {}
 support_message = {}
 continue_chat = {}
 receipt_mode = {}
+receipt_lookup_mode = {}
 confirm_clear_panel = {}
 # ---------------- BAN ----------------
 def is_banned(uid):
@@ -157,7 +158,7 @@ def user_menu():
 def admin_menu():
     return ReplyKeyboardMarkup(
         [
-            ["📣 ارسال همگانی"],
+            ["📣 ارسال همگانی", "🧾 جستجوی کد کاربر"],
             ["📋 تیکت‌های باز", "📊 گزارش پنل"],
             ["🗑 پاکسازی گزارش پنل", "✅ رفع افراد مسدود شده"]
         ],
@@ -516,6 +517,34 @@ async def handle(update: Update, context):
                 ])
             )
             return
+        if uid in ADMIN_IDS and receipt_lookup_mode.get(uid):
+
+            username = text.strip().replace("@", "")
+        
+            cur.execute("""
+                SELECT tx_code, created, status
+                FROM receipts
+                WHERE username=?
+                AND status='accepted'
+                ORDER BY id DESC
+            """, (username,))
+        
+            rows = cur.fetchall()
+        
+            receipt_lookup_mode.pop(uid, None)
+        
+            if not rows:
+                await update.message.reply_text("❌ هیچ کد تایید شده‌ای پیدا نشد")
+                return
+        
+            msg = f"🧾 کدهای تایید شده @{username}:\n\n"
+        
+            for tx_code, created, status in rows:
+                msg += f"✅ {tx_code}\n"
+        
+            await update.message.reply_text(msg)
+        
+            return
         if text == "📊 گزارش پنل":
 
             cur.execute("SELECT COUNT(*) FROM users")
@@ -671,6 +700,11 @@ async def handle(update: Update, context):
             return
 
     # ---------------- USER ----------------
+    if text == "🧾 جستجوی کد کاربر":
+        receipt_lookup_mode[uid] = True
+        await update.message.reply_text("👤 یوزرنیم کاربر را وارد کنید (بدون @)")
+        return
+        
     if text == "👤 پروفایل من":
 
         cur.execute("SELECT username, join_time, tickets_count FROM profiles WHERE user_id=?", (uid,))
