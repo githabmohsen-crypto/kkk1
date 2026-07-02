@@ -594,11 +594,11 @@ async def handle(update: Update, context):
             )
         return
     if text == "🔙 بازگشت":
-    await update.message.reply_text(
-        "🏠 به منوی اصلی برگشتید",
-        reply_markup=user_menu()
-    )
-    return
+        await update.message.reply_text(
+            "🏠 به منوی اصلی برگشتید",
+            reply_markup=user_menu()
+        )
+        return
 
     if text == "📜 قوانین":
         await update.message.reply_text(
