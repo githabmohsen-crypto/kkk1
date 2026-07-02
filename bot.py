@@ -658,20 +658,18 @@ async def handle(update: Update, context):
             "💙 با استفاده از ربات قوانین را پذیرفته‌اید"
         )
         return
-# 1. ورود به حالت ارسال رسید
-# 📨 ارسال رسید
-if text == "📨 ارسال رسید":
-
-    await update.message.reply_text(
-        "📎 لطفاً رسید خود را ارسال کنید",
-        reply_markup=receipt_menu()
-    )
-
-    receipt_mode[uid] = True
-    return
-
-
-# 📖 راهنما
+    if text == "📨 ارسال رسید":
+    
+        await update.message.reply_text(
+            "📎 لطفاً رسید خود را ارسال کنید",
+            reply_markup=receipt_menu()
+        )
+    
+        receipt_mode[uid] = True
+        return
+    
+    
+    # 📖 راهنما
     if text == "📖 راهنما":
     
         await update.message.reply_text(
@@ -741,7 +739,6 @@ if text == "📨 ارسال رسید":
     
         receipt_mode.pop(uid, None)
         return
-        
 
     if text == "📞 تماس با پشتیبانی":
     
