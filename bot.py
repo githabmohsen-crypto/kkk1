@@ -474,7 +474,9 @@ async def handle(update: Update, context):
 
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
+    
         if receipt_lookup_mode.get(uid):
+    
             admin_buttons = [
                 "📊 گزارش پنل",
                 "📋 تیکت‌های باز",
@@ -482,15 +484,16 @@ async def handle(update: Update, context):
                 "📣 ارسال همگانی",
                 "✅ رفع افراد مسدود شده"
             ]
-
-        # اگر دکمه زد → خارج شو
-        if text in admin_buttons:
-            return
-
-        if not text:
-            return
+    
+            # اگر دکمه زد → خارج شو
+            if text in admin_buttons:
+                return
+    
+            if not text:
+                return
+    
             query = text.strip()
-        
+    
             # اگر عدد بود => user_id
             if query.isdigit():
                 cur.execute("""
@@ -500,13 +503,12 @@ async def handle(update: Update, context):
                     AND status='accepted'
                     ORDER BY id DESC
                 """, (int(query),))
-        
+    
                 label = f"🆔 {query}"
-        
+    
             else:
-                # اگر یوزرنیم بود
                 username = query.replace("@", "")
-        
+    
                 cur.execute("""
                     SELECT tx_code
                     FROM receipts
@@ -514,16 +516,21 @@ async def handle(update: Update, context):
                     AND status='accepted'
                     ORDER BY id DESC
                 """, (username,))
-        
+    
                 label = f"@{username}"
-        
+    
             rows = cur.fetchall()
             receipt_lookup_mode.pop(uid, None)
-        
+    
             if not rows:
                 await update.message.reply_text("❌ هیچ کد تایید شده‌ای پیدا نشد")
                 return
-        
+    
+            msg = f"🧾 کدهای تایید شده برای {label}:\n\n"
+            msg += "\n".join([f"✅ {r[0]}" for r in rows])
+    
+            await update.message.reply_text(msg)
+            return
             msg = f"🧾 کدهای تایید شده برای {label}:\n\n"
             msg += "\n".join([f"✅ {r[0]}" for r in rows])
         
