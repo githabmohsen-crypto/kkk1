@@ -788,6 +788,32 @@ async def handle(update: Update, context):
                 f"📅 عضویت: {time.strftime('%Y-%m-%d', time.localtime(join_time))}"
             )
         return
+    if text == "🔙 بازگشت":
+    
+        # ❌ لغو همه حالت‌ها
+        ticket_mode.pop(uid, None)
+        continue_chat.pop(uid, None)
+        receipt_mode.pop(uid, None)   # 👈 این مهمه
+    
+        # (اختیاری) حذف تیکت خالی
+        cur.execute("""
+            SELECT id FROM tickets
+            WHERE user_id=? AND status='open' AND message=''
+            ORDER BY id DESC
+            LIMIT 1
+        """, (uid,))
+        empty_ticket = cur.fetchone()
+    
+        if empty_ticket:
+            cur.execute("DELETE FROM tickets WHERE id=?", (empty_ticket[0],))
+            db.commit()
+    
+        await update.message.reply_text(
+            "🏠 به منوی اصلی برگشتید",
+            reply_markup=user_menu()
+        )
+    
+        return
 
     if text == "📜 قوانین":
         await update.message.reply_text(
