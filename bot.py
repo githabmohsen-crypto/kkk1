@@ -140,7 +140,6 @@ def user_menu():
             ["📞 تماس با پشتیبانی"],
             ["📜 قوانین"],
             ["📨 ارسال رسید"],
-            ["🔙 بازگشت"]
         ],
         resize_keyboard=True
     )
@@ -155,7 +154,13 @@ def admin_menu():
         ],
         resize_keyboard=True
     )
-
+def receipt_menu():
+    return ReplyKeyboardMarkup(
+        [
+            ["🔙 بازگشت"]
+        ],
+        resize_keyboard=True
+    )
 # ---------------- START ----------------
 async def start(update: Update, context):
 
@@ -594,12 +599,15 @@ async def handle(update: Update, context):
             )
         return
     if text == "🔙 بازگشت":
+    
+        receipt_mode.pop(uid, None)
+    
         await update.message.reply_text(
             "🏠 به منوی اصلی برگشتید",
             reply_markup=user_menu()
         )
+    
         return
-
     if text == "📜 قوانین":
         await update.message.reply_text(
             "📜 قوانین سیستم پشتیبانی Kaletek\n\n"
@@ -616,11 +624,14 @@ async def handle(update: Update, context):
         return
     if text == "📨 ارسال رسید":
     
-        receipt_mode[uid] = True
-    
         await update.message.reply_text(
-            "📷 لطفاً تصویر رسید خود را ارسال کنید."
+            "📎 لطفاً رسید خود را ارسال کنید",
+            reply_markup=receipt_menu()
         )
+    
+        receipt_mode[uid] = True  # اگر حالت داری
+    
+        return
     
         return
     if receipt_mode.get(uid):
