@@ -262,8 +262,8 @@ async def callback(update: Update, context):
     
         return
     if q.data.startswith("reject_receipt_"):
-
-        receipt_id = int(q.data.split("_")[2])
+    
+        receipt_id = int(q.data.split("_")[-1])
     
         cur.execute(
             "UPDATE receipts SET status='rejected' WHERE id=?",
@@ -710,9 +710,9 @@ async def handle(update: Update, context):
         username = update.effective_user.username or "ندارد"
     
         cur.execute("""
-            INSERT INTO receipts(user_id, username)
-            VALUES(?, ?)
-        """, (uid, username))
+            INSERT INTO receipts(user_id, username, file_id)
+            VALUES(?, ?, ?)
+        """, (uid, username, file_id))
     
         db.commit()
         receipt_id = cur.lastrowid
