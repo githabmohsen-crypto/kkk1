@@ -768,17 +768,6 @@ async def handle(update: Update, context):
                 )
             except Exception as e:
                 print("ADMIN SEND ERROR:", e)
-        # ارسال به ادمین 👇 (این بخش مهمه و تو کدت کم بوده)
-        for admin in ADMIN_IDS:
-            try:
-                await context.bot.send_message(
-                    admin,
-                    f"📨 ادامه پیام برای تیکت #{tid}\n\n{text or caption}",
-                    reply_markup=keyboard
-                )
-            except Exception as e:
-                print("ADMIN SEND ERROR:", e)
-    
         await update.message.reply_text("پیام شما به تیکت قبلی اضافه شد ✅")
     
         continue_chat.pop(uid, None)
