@@ -750,6 +750,18 @@ async def handle(update: Update, context):
                     f"🆔 {uid}\n\n"
                     f"📝 {message_text}"
                 )
+                    reply_markup=InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")
+                        ],
+                        [
+                            InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")
+                        ],
+                        [
+                            InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")
+                        ]
+                    ])
+                )                
             except Exception as e:
                 print("ADMIN SEND ERROR:", e)
     
