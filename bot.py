@@ -135,10 +135,15 @@ async def enforce_channel(update, context):
 # ---------------- MENUS ----------------
 def user_menu():
     return ReplyKeyboardMarkup(
-        [["👤 پروفایل من"], ["📞 تماس با پشتیبانی"], ["📜 قوانین"], ["📨 ارسال رسید"]],
+        [
+            ["👤 پروفایل من"],
+            ["📞 تماس با پشتیبانی"],
+            ["📜 قوانین"],
+            ["📨 ارسال رسید"],
+            ["🔙 بازگشت"]
+        ],
         resize_keyboard=True
     )
-
 def admin_menu():
     return ReplyKeyboardMarkup(
         [
@@ -588,6 +593,12 @@ async def handle(update: Update, context):
                 f"📅 عضویت: {time.strftime('%Y-%m-%d', time.localtime(join_time))}"
             )
         return
+    if text == "🔙 بازگشت":
+    await update.message.reply_text(
+        "🏠 به منوی اصلی برگشتید",
+        reply_markup=user_menu()
+    )
+    return
 
     if text == "📜 قوانین":
         await update.message.reply_text(
