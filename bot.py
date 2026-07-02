@@ -683,7 +683,8 @@ async def handle(update: Update, context):
         
 
     if text == "📞 تماس با پشتیبانی":
-# اگر پیام قبلی وجود دارد حذفش کن
+    
+        # حذف پیام قبلی
         if uid in support_message:
             try:
                 await context.bot.delete_message(
@@ -692,19 +693,20 @@ async def handle(update: Update, context):
                 )
             except:
                 pass
-        
+    
         msg = await update.message.reply_text(
             "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه پایین استفاده کنید.\n\n"
-            "‼️ لطفاً موضوع را در قالب یک پیام منسجم و واضح بنویسید؛ این کار باعث می‌شود پاسخگویی سریع‌تر انجام شود 💙\n\n"
-            "بعد از باز شدن تیکت جدید، تنها مجاز به ارسال یک پیام هستید و"
-            "تا زمانی که پاسخ ادمین ثبت نشده باشد امکان ارسال پیام بعدی وجود ندارد. لطفاً پیام خود را با دقت کامل ثبت کنید تا روند رسیدگی سریع‌تر انجام شود. ⏳📩\n\n"
-           " هرگونه بی‌احترامی به ادمین منجر به مسدودسازی دائمی حساب شما از سیستم خواهد شد. 🚫🔒\n\n"
-            "✅ با لمس دکمه زیر، گفتگو با تیم پشتیبانی آغاز می‌شود.",
+            "‼️ لطفاً موضوع را واضح و کامل بنویسید 💙\n\n"
+            "پس از ثبت تیکت، تا پاسخ ادمین صبور باشید ⏳\n\n"
+            "🚫 ارسال پیام پشت سر هم قبل از پاسخ ممنوع است.",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
             ])
         )
-        
+    
+        support_message[uid] = msg.message_id
+    
+        return
         support_message[uid] = msg.message_id
     cur.execute("""
     SELECT id, waiting_admin
