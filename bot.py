@@ -75,6 +75,12 @@ status TEXT DEFAULT 'pending'
 
 db.commit()
 
+ try:
+    cur.execute("ALTER TABLE receipts ADD COLUMN file_id TEXT;")
+    db.commit()
+except:
+    pass
+    
 try:
     cur.execute("ALTER TABLE tickets ADD COLUMN waiting_admin INTEGER DEFAULT 1")
     db.commit()
@@ -242,21 +248,52 @@ async def callback(update: Update, context):
         )
         return
     if q.data.startswith("accept_receipt_"):
-
+    
         receipt_id = int(q.data.split("_")[2])
     
-        cur.execute(
-            "UPDATE receipts SET status='accepted' WHERE id=?",
-            (receipt_id,)
-        )
+        cur.execute("""
+            SELECT user_id, file_id
+            FROM receipts
+            WHERE id=?
+        """, (receipt_id,))
     
+        row = cur.fetchone()
+    
+        if not row:
+            await q.answer("❌ رسید پیدا نشد")
+            return
+    
+        user_id, file_id = row
+    
+        # ✔ ساخت کد تایید
+        import random
+        tx_code = f"TX-{random.randint(100000, 999999)}"
+    
+        # ✔ آپدیت دیتابیس
+        cur.execute("""
+            UPDATE receipts
+            SET status='accepted', tx_code=?
+            WHERE id=?
+        """, (tx_code, receipt_id))
         db.commit()
     
-        await q.answer("✅ رسید تایید شد")
+        await q.answer("✅ تایید شد")
+    
+        try:
+            await context.bot.send_photo(
+                chat_id=user_id,
+                photo=file_id,
+                caption=(
+                    "✅ رسید شما تایید شد\n\n"
+                    f"🧾 کد تایید: {tx_code}\n\n"
+                )
+            )
+        except:
+            pass
     
         await q.edit_message_reply_markup(
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("✅ رسید تایید شد", callback_data="done")]
+                [InlineKeyboardButton("✅ تایید شد", callback_data="done")]
             ])
         )
     
@@ -709,12 +746,14 @@ async def handle(update: Update, context):
     
         username = update.effective_user.username or "ندارد"
     
+        # ✔ ذخیره رسید همراه file_id (مهم‌ترین تغییر)
         cur.execute("""
-            INSERT INTO receipts(user_id, username)
-            VALUES(?, ?)
-        """, (uid, username))
+            INSERT INTO receipts(user_id, username, file_id)
+            VALUES(?, ?, ?)
+        """, (uid, username, file_id))
     
         db.commit()
+    
         receipt_id = cur.lastrowid
     
         for admin in ADMIN_IDS:
@@ -739,7 +778,6 @@ async def handle(update: Update, context):
     
         receipt_mode.pop(uid, None)
         return
-
     if text == "📞 تماس با پشتیبانی":
     
         if uid in support_message:
