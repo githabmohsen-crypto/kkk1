@@ -74,11 +74,7 @@ status TEXT DEFAULT 'pending'
 """)
 
 db.commit()
-try:
-    cur.execute("SELECT id, tx_code FROM receipts")
-    db.commit()
-except:
-    pass
+
 try:
     cur.execute("ALTER TABLE receipts ADD COLUMN tx_code TEXT;")
     db.commit()
@@ -466,110 +462,6 @@ async def callback(update: Update, context):
 # ---------------- HANDLE ----------------
 async def handle(update: Update, context):
 
-    uid = update.effective_user.id
-    text = update.message.text or ""
-
-    if not await enforce_channel(update, context):
-        return
-
-    # ---------------- ADMIN SEARCH ----------------
-    if uid in ADMIN_IDS:
-    
-        text = (update.message.text or "").strip()
-    
-        # ❌ فقط اجازه بده اگر دستور باشه
-        if not (text.startswith("/FIND ") or text.startswith("/user")):
-            # هیچ کاری نکن، بذار بقیه کدها اجرا بشن
-            pass
-    
-        else:
-    
-            # ================= FIND =================
-            if text.startswith("/FIND "):
-    
-                tx_code = text.replace("/FIND ", "").strip().upper()
-    
-                cur.execute("""
-                    SELECT user_id, username, status, file_id, tx_code
-                    FROM receipts
-                    WHERE UPPER(tx_code)=?
-                """, (tx_code,))
-    
-                row = cur.fetchone()
-    
-                if not row:
-                    await update.message.reply_text("❌ هیچ رسیدی با این کد پیدا نشد")
-                    return
-    
-                user_id, username, status, file_id, tx_code = row
-    
-                status_text = {
-                    "pending": "⏳ در انتظار",
-                    "accepted": "✅ تایید شده",
-                    "rejected": "❌ رد شده"
-                }.get(status, status)
-    
-                await context.bot.send_photo(
-                    chat_id=uid,
-                    photo=file_id,
-                    caption=(
-                        "🧾 نتیجه جستجوی رسید\n\n"
-                        f"👤 @{username}\n"
-                        f"🆔 {user_id}\n"
-                        f"📌 وضعیت: {status_text}\n"
-                        f"🔑 TX: {tx_code}"
-                    )
-                )
-                return
-    
-            # ================= USER =================
-            if text.startswith("/user"):
-    
-                query = text.replace("/user", "").strip()
-    
-                if query.isdigit():
-                    cur.execute("""
-                        SELECT user_id, username, status, tx_code
-                        FROM receipts
-                        WHERE user_id=?
-                        ORDER BY id DESC
-                    """, (int(query),))
-                else:
-                    username = query.replace("@", "")
-                    cur.execute("""
-                        SELECT user_id, username, status, tx_code
-                        FROM receipts
-                        WHERE username=?
-                        ORDER BY id DESC
-                    """, (username,))
-    
-                rows = cur.fetchall()
-    
-                if not rows:
-                    await update.message.reply_text("❌ هیچ رسیدی برای این کاربر پیدا نشد")
-                    return
-    
-                user_id = rows[0][0]
-                username = rows[0][1]
-    
-                text_out = f"🧾 گزارش کاربر\n\n👤 @{username}\n🆔 {user_id}\n\n"
-    
-                for i, (uid2, uname, status, tx) in enumerate(rows, 1):
-    
-                    status_text = {
-                        "pending": "⏳ در انتظار",
-                        "accepted": "✅ تایید شده",
-                        "rejected": "❌ رد شده"
-                    }.get(status, status)
-    
-                    text_out += (
-                        f"{i}. 🔑 {tx}\n"
-                        f"   📌 {status_text}\n\n"
-                    )
-    
-                await update.message.reply_text(text_out)
-                return
-
     if not await enforce_channel(update, context):
         return
 
@@ -581,46 +473,6 @@ async def handle(update: Update, context):
 
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
-        if uid in ADMIN_IDS and text:
-        
-            tx_code = text.strip().upper()
-        
-            if tx_code.startswith("/FIND "):
-                tx_code = tx_code.replace("/FIND ", "").strip()
-        
-            cur.execute("""
-                SELECT user_id, username, status, file_id, tx_code
-                FROM receipts
-                WHERE UPPER(tx_code)=?
-            """, (tx_code,))
-        
-            row = cur.fetchone()
-        
-            if not row:
-                await update.message.reply_text("❌ هیچ رسیدی با این کد پیدا نشد")
-                return
-        
-            user_id, username, status, file_id, tx_code = row
-        
-            status_text = {
-                "pending": "⏳ در انتظار",
-                "accepted": "✅ تایید شده",
-                "rejected": "❌ رد شده"
-            }.get(status, status)
-        
-            await context.bot.send_photo(
-                chat_id=uid,
-                photo=file_id,
-                caption=(
-                    "🧾 نتیجه جستجوی رسید\n\n"
-                    f"👤 @{username}\n"
-                    f"🆔 {user_id}\n"
-                    f"📌 وضعیت: {status_text}\n"
-                    f"🔑 TX: {tx_code}"
-                )
-            )
-        
-            return
 
         if text == "📣 ارسال همگانی":
             broadcast_mode[uid] = True
