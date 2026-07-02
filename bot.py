@@ -178,6 +178,11 @@ def support_chat_menu():
         ],
         resize_keyboard=True
     )
+def back_menu():
+    return ReplyKeyboardMarkup(
+        [["🔙 بازگشت"]],
+        resize_keyboard=True
+    )
 # ---------------- START ----------------
 async def start(update: Update, context):
 
@@ -538,7 +543,11 @@ async def handle(update: Update, context):
             return
         if text == "📣 ارسال همگانی":
             broadcast_mode[uid] = True
-            await update.message.reply_text("✍ پیام همگانی را ارسال کنید")
+        
+            await update.message.reply_text(
+                "✍ پیام همگانی را ارسال کنید",
+                reply_markup=back_menu()
+            )
             return
         if text == "✅ رفع افراد مسدود شده":
             unban_mode[uid] = True
@@ -736,9 +745,12 @@ async def handle(update: Update, context):
     # ---------------- USER ----------------
     if text == "🧾 جستجوی کد کاربر":
         receipt_lookup_mode[uid] = True
-        await update.message.reply_text("👤 یوزر آیدی یا یوزرنیم کاربر را وارد کنید (بدون @)")
+    
+        await update.message.reply_text(
+            "👤 یوزرنیم یا آیدی کاربر را وارد کنید",
+            reply_markup=back_menu()
+        )
         return
-        
     if text == "👤 پروفایل من":
 
         cur.execute("SELECT username, join_time, tickets_count FROM profiles WHERE user_id=?", (uid,))
@@ -760,7 +772,10 @@ async def handle(update: Update, context):
         # ❌ لغو همه حالت‌ها
         ticket_mode.pop(uid, None)
         continue_chat.pop(uid, None)
-        receipt_mode.pop(uid, None)   # 👈 این مهمه
+        
+        unban_mode.pop(uid, None)
+        broadcast_mode.pop(uid, None)
+        receipt_mode.pop(uid, None) # 👈 این مهمه
     
         # (اختیاری) حذف تیکت خالی
         cur.execute("""
