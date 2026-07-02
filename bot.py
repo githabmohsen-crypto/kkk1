@@ -336,7 +336,7 @@ async def callback(update: Update, context):
                 photo=file_id,
                 caption=(
                     "❌ رسید شما تایید نشد\n\n"
-                    "📌 لطفاً بررسی کنید و دوباره ارسال کنید."
+                    "📌 رسید شما رد شد و مورد تایید نمی باشد ."
                 )
             )
         except:
@@ -473,6 +473,72 @@ async def handle(update: Update, context):
 
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
+        if uid in ADMIN_IDS and text and text.startswith("/find "):
+        
+            tx_code = text.replace("/find ", "").strip()
+        
+            cur.execute("""
+                SELECT user_id, username, status, file_id
+                FROM receipts
+                WHERE tx_code=?
+            """, (tx_code,))
+        
+            row = cur.fetchone()
+        
+            if not row:
+                await update.message.reply_text("❌ هیچ رسیدی با این کد پیدا نشد")
+                return
+        
+            user_id, username, status, file_id = row
+        
+            status_text = {
+                "pending": "⏳ در انتظار بررسی",
+                "accepted": "✅ تایید شده",
+                "rejected": "❌ رد شده"
+            }.get(status, status)
+        
+            await update.message.reply_photo(
+                photo=file_id,
+                caption=(
+                    f"🧾 نتیجه جستجوی رسید\n\n"
+                    f"👤 کاربر: @{username}\n"
+                    f"🆔 ID: {user_id}\n"
+                    f"📌 وضعیت: {status_text}\n"
+                    f"🔑 TX: {tx_code}"
+                )
+            )
+        
+            return
+        if uid in ADMIN_IDS and text and text.startswith("TX-"):
+
+            tx_code = text.strip()
+        
+            cur.execute("""
+                SELECT user_id, username, status, file_id
+                FROM receipts
+                WHERE tx_code=?
+            """, (tx_code,))
+        
+            row = cur.fetchone()
+        
+            if not row:
+                await update.message.reply_text("❌ پیدا نشد")
+                return
+        
+            user_id, username, status, file_id = row
+        
+            await update.message.reply_photo(
+                photo=file_id,
+                caption=(
+                    f"🧾 رسید پیدا شد\n\n"
+                    f"👤 @{username}\n"
+                    f"🆔 {user_id}\n"
+                    f"📌 وضعیت: {status}\n"
+                    f"🔑 TX: {tx_code}"
+                )
+            )
+        
+            return
 
         if text == "📣 ارسال همگانی":
             broadcast_mode[uid] = True
