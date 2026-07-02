@@ -74,7 +74,11 @@ status TEXT DEFAULT 'pending'
 """)
 
 db.commit()
-
+try:
+    cur.execute("SELECT id, tx_code FROM receipts")
+    db.commit()
+except:
+    pass
 try:
     cur.execute("ALTER TABLE receipts ADD COLUMN tx_code TEXT;")
     db.commit()
@@ -473,14 +477,17 @@ async def handle(update: Update, context):
 
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
-        if uid in ADMIN_IDS and text and text.startswith("/find "):
+        if uid in ADMIN_IDS and text:
         
-            tx_code = text.replace("/find ", "").strip()
+            tx_code = text.strip().upper()
+        
+            if tx_code.startswith("/FIND "):
+                tx_code = tx_code.replace("/FIND ", "").strip()
         
             cur.execute("""
-                SELECT user_id, username, status, file_id
+                SELECT user_id, username, status, file_id, tx_code
                 FROM receipts
-                WHERE tx_code=?
+                WHERE UPPER(tx_code)=?
             """, (tx_code,))
         
             row = cur.fetchone()
@@ -489,51 +496,22 @@ async def handle(update: Update, context):
                 await update.message.reply_text("❌ هیچ رسیدی با این کد پیدا نشد")
                 return
         
-            user_id, username, status, file_id = row
+            user_id, username, status, file_id, tx_code = row
         
             status_text = {
-                "pending": "⏳ در انتظار بررسی",
+                "pending": "⏳ در انتظار",
                 "accepted": "✅ تایید شده",
                 "rejected": "❌ رد شده"
             }.get(status, status)
         
-            await update.message.reply_photo(
+            await context.bot.send_photo(
+                chat_id=uid,
                 photo=file_id,
                 caption=(
-                    f"🧾 نتیجه جستجوی رسید\n\n"
-                    f"👤 کاربر: @{username}\n"
-                    f"🆔 ID: {user_id}\n"
-                    f"📌 وضعیت: {status_text}\n"
-                    f"🔑 TX: {tx_code}"
-                )
-            )
-        
-            return
-        if uid in ADMIN_IDS and text and text.startswith("TX-"):
-
-            tx_code = text.strip()
-        
-            cur.execute("""
-                SELECT user_id, username, status, file_id
-                FROM receipts
-                WHERE tx_code=?
-            """, (tx_code,))
-        
-            row = cur.fetchone()
-        
-            if not row:
-                await update.message.reply_text("❌ پیدا نشد")
-                return
-        
-            user_id, username, status, file_id = row
-        
-            await update.message.reply_photo(
-                photo=file_id,
-                caption=(
-                    f"🧾 رسید پیدا شد\n\n"
+                    "🧾 نتیجه جستجوی رسید\n\n"
                     f"👤 @{username}\n"
                     f"🆔 {user_id}\n"
-                    f"📌 وضعیت: {status}\n"
+                    f"📌 وضعیت: {status_text}\n"
                     f"🔑 TX: {tx_code}"
                 )
             )
