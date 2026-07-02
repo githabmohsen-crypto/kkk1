@@ -722,7 +722,11 @@ async def handle(update: Update, context):
         can_continue = continue_chat.get(uid, False)
     
         if waiting == 1 and not can_continue:
-            await update.message.reply_text("⏳ در حال بررسی هست")
+            await update.message.reply_text(
+                "⏳ کارشناسان در حال بررسی پیام قبلی شما هستند\n\n"
+                "لطفاً تا زمان پاسخگویی کارشناسان صبور باشید.\n"
+                "پس از دریافت پاسخ، می‌توانید پیام جدید خود را ارسال کنید. 🙏"
+            )
             return
     
         message_text = text or caption or "📎 پیام جدید"
