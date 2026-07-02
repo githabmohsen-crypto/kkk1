@@ -723,13 +723,18 @@ async def handle(update: Update, context):
             except:
                 pass
     
-        await update.message.reply_text(
+        msg = await update.message.reply_text(
             "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه پایین استفاده کنید.\n\n"
             "‼️ لطفاً موضوع را واضح و کامل بنویسید 💙\n\n"
             "پس از ثبت تیکت، تا پاسخ ادمین صبور باشید ⏳\n\n"
             "🚫 ارسال پیام پشت سر هم قبل از پاسخ ممنوع است.",
-            reply_markup=support_menu()   # 👈 فقط تغییر منو
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")],
+                [InlineKeyboardButton("🔙 بازگشت", callback_data="back_main")]
+            ])
         )
+    
+        support_message[uid] = msg.message_id
     
         return
         support_message[uid] = msg.message_id
