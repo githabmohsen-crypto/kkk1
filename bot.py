@@ -829,18 +829,33 @@ async def handle(update: Update, context):
         ])
 
         for admin in ADMIN_IDS:
-            await context.bot.send_message(
-                admin,
-                f"📨 پیام جدید برای تیکت #{tid}\n\n{text or caption}",
-                reply_markup=keyboard
-            )
-
+            try:
+                if photo:
+                    await context.bot.send_photo(
+                        admin,
+                        photo[-1].file_id,
+                        caption=(
+                            f"📨 پیام جدید برای تیکت #{tid}\n\n"
+                            f"👤 @{update.effective_user.username or 'ندارد'}\n"
+                            f"🆔 {uid}\n\n"
+                            f"📝 {caption or text}"
+                        ),
+                        reply_markup=keyboard
+                    )
+                else:
+                    await context.bot.send_message(
+                        admin,
+                        f"📨 پیام جدید برای تیکت #{tid}\n\n{text or caption}",
+                        reply_markup=keyboard
+                    )
+            except Exception as e:
+                print("ADMIN SEND ERROR:", e)
+        
         await update.message.reply_text(
             "✅ پیام شما ارسال شد."
         )
-
+        
         return
-
     if ticket_mode.get(uid):
     
         username = update.effective_user.username or "ندارد"
