@@ -659,29 +659,21 @@ async def handle(update: Update, context):
         )
         return
 # 1. ورود به حالت ارسال رسید
-    if text == "📨 ارسال رسید":
-    
-        await update.message.reply_text(
-            "📎 لطفاً رسید خود را ارسال کنید",
-            reply_markup=receipt_menu()
-        )
-    
-        receipt_mode[uid] = True  # اگر حالت داری
-    
-        return
-    
-        return
-    if receipt_mode.get(uid):
-    
-        if not photo:
-    
-            await update.message.reply_text(
-                "❌ لطفاً فقط تصویر رسید را ارسال کنید."
-            )
-    
-            return 
-    if text == "📖 راهنما":
+# 📨 ارسال رسید
+if text == "📨 ارسال رسید":
 
+    await update.message.reply_text(
+        "📎 لطفاً رسید خود را ارسال کنید",
+        reply_markup=receipt_menu()
+    )
+
+    receipt_mode[uid] = True
+    return
+
+
+# 📖 راهنما
+    if text == "📖 راهنما":
+    
         await update.message.reply_text(
             "📖 راهنمای ربات Kaletek\n\n"
             "در صورت داشتن هرگونه سوال یا مشکل، لطفاً از طریق دکمه «📞 تماس با پشتیبانی» اقدام کنید و از ارسال پیام به آیدی ادمین خودداری نمایید.\n"
@@ -697,63 +689,57 @@ async def handle(update: Update, context):
     
         return
     
+    
+    # 🧾 بررسی ارسال رسید (فقط وقتی حالت فعاله)
+    if receipt_mode.get(uid):
+    
+        if not photo:
+            await update.message.reply_text("❌ لطفاً فقط تصویر رسید را ارسال کنید.")
+            return
+    
+        file_id = photo[-1].file_id
+    
         cur.execute("""
-        SELECT id
-        FROM tickets
-        WHERE user_id=? AND status='open'
-        ORDER BY id DESC
-        LIMIT 1
+            SELECT id FROM tickets
+            WHERE user_id=? AND status='open'
+            ORDER BY id DESC
+            LIMIT 1
         """, (uid,))
     
         row = cur.fetchone()
-    
         tid = row[0] if row else 0
     
         username = update.effective_user.username or "ندارد"
+    
         cur.execute("""
-        INSERT INTO receipts(user_id, username)
-        VALUES(?, ?)
+            INSERT INTO receipts(user_id, username)
+            VALUES(?, ?)
         """, (uid, username))
-        
+    
         db.commit()
-        
         receipt_id = cur.lastrowid
     
         for admin in ADMIN_IDS:
-    
             await context.bot.send_photo(
                 admin,
-                photo[-1].file_id,
+                photo=file_id,
                 caption=(
                     f"🧾 رسید جدید\n\n"
                     f"👤 @{username}\n"
                     f"🆔 {uid}"
                 ),
                 reply_markup=InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("✅ تایید رسید", callback_data=f"accept_receipt_{receipt_id}")
-                    ],
-                    [
-                        InlineKeyboardButton("❌ عدم تایید", callback_data=f"reject_receipt_{receipt_id}")
-                    ],
-                    [
-                        InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")
-                    ],
-                    [
-                        InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")
-                    ],
-                    [
-                        InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")
-                    ]
+                    [InlineKeyboardButton("✅ تایید رسید", callback_data=f"accept_receipt_{receipt_id}")],
+                    [InlineKeyboardButton("❌ عدم تایید", callback_data=f"reject_receipt_{receipt_id}")],
+                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                    [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
                 ])
             )
     
-        await update.message.reply_text(
-            "✅ رسید شما با موفقیت ارسال شد."
-        )
+        await update.message.reply_text("✅ رسید شما با موفقیت ارسال شد.")
     
         receipt_mode.pop(uid, None)
-    
         return
         
 
