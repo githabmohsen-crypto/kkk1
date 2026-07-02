@@ -75,6 +75,14 @@ status TEXT DEFAULT 'pending'
 
 db.commit()
 
+cur.execute("""
+CREATE TABLE IF NOT EXISTS user_reset(
+    user_id INTEGER PRIMARY KEY,
+    last_reset INTEGER
+)
+""")
+db.commit()
+
 try:
     cur.execute("ALTER TABLE receipts ADD COLUMN tx_code TEXT;")
     db.commit()
@@ -184,6 +192,29 @@ def back_menu():
         [["🔙 بازگشت"]],
         resize_keyboard=True
     )
+def need_reset(uid):
+    cur.execute("SELECT last_reset FROM user_reset WHERE user_id=?", (uid,))
+    row = cur.fetchone()
+
+    now = int(time.time())
+
+    if not row:
+        cur.execute("INSERT INTO user_reset(user_id, last_reset) VALUES(?, ?)", (uid, now))
+        db.commit()
+        return False
+
+    last_reset = row[0]
+
+    if now - last_reset >= 86400:  # 24 ساعت
+        cur.execute("UPDATE user_reset SET last_reset=? WHERE user_id=?", (now, uid))
+        db.commit()
+        return True
+
+    return False
+def clear_user_history(uid):
+    cur.execute("DELETE FROM tickets WHERE user_id=?", (uid,))
+    cur.execute("DELETE FROM receipts WHERE user_id=?", (uid,))
+    db.commit()
 # ---------------- START ----------------
 async def start(update: Update, context):
 
@@ -479,6 +510,13 @@ async def handle(update: Update, context):
     caption = update.message.caption or ""
 
     # ---------------- ADMIN ----------------
+    if uid not in ADMIN_IDS:
+        if need_reset(uid):
+            clear_user_history(uid)
+            await update.message.reply_text(
+                "🧹 تاریخچه شما به صورت خودکار هر 24 ساعت پاک شد"
+            )
+            return   # 👈 خیلی مهم
     if uid in ADMIN_IDS:
         if text == "🔙 بازگشت":
         
