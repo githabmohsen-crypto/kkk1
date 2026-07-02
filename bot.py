@@ -473,52 +473,53 @@ async def handle(update: Update, context):
         return
 
     # ---------------- ADMIN SEARCH: TX CODE ----------------
-    if uid in ADMIN_IDS:
+# ---------------- ADMIN SEARCH ----------------
+if uid in ADMIN_IDS:
 
-        # 🔎 جستجو با TX
-        tx_code = text.strip().upper()
+    text = update.message.text or ""
 
-        if tx_code.startswith("/FIND "):
-            tx_code = tx_code.replace("/FIND ", "").strip()
+    # 🔎 فقط وقتی /FIND باشه
+    if text.startswith("/FIND "):
 
-            cur.execute("""
-                SELECT user_id, username, status, file_id, tx_code
-                FROM receipts
-                WHERE UPPER(tx_code)=?
-            """, (tx_code,))
+        tx_code = text.replace("/FIND ", "").strip().upper()
 
-            row = cur.fetchone()
+        cur.execute("""
+            SELECT user_id, username, status, file_id, tx_code
+            FROM receipts
+            WHERE UPPER(tx_code)=?
+        """, (tx_code,))
 
-            if not row:
-                await update.message.reply_text("❌ هیچ رسیدی با این کد پیدا نشد")
-                return
+        row = cur.fetchone()
 
-            user_id, username, status, file_id, tx_code = row
-
-            status_text = {
-                "pending": "⏳ در انتظار",
-                "accepted": "✅ تایید شده",
-                "rejected": "❌ رد شده"
-            }.get(status, status)
-
-            await context.bot.send_photo(
-                chat_id=uid,
-                photo=file_id,
-                caption=(
-                    "🧾 نتیجه جستجوی رسید\n\n"
-                    f"👤 @{username}\n"
-                    f"🆔 {user_id}\n"
-                    f"📌 وضعیت: {status_text}\n"
-                    f"🔑 TX: {tx_code}"
-                )
-            )
+        if not row:
+            await update.message.reply_text("❌ هیچ رسیدی با این کد پیدا نشد")
             return
 
-        # 🔎 جستجو با user_id یا username
-        query = text.strip()
+        user_id, username, status, file_id, tx_code = row
 
-        if query.startswith("/user "):
-            query = query.replace("/user ", "").strip()
+        status_text = {
+            "pending": "⏳ در انتظار",
+            "accepted": "✅ تایید شده",
+            "rejected": "❌ رد شده"
+        }.get(status, status)
+
+        await context.bot.send_photo(
+            chat_id=uid,
+            photo=file_id,
+            caption=(
+                "🧾 نتیجه جستجوی رسید\n\n"
+                f"👤 @{username}\n"
+                f"🆔 {user_id}\n"
+                f"📌 وضعیت: {status_text}\n"
+                f"🔑 TX: {tx_code}"
+            )
+        )
+        return
+
+    # 🔎 فقط وقتی /user باشه
+    if text.startswith("/user"):
+
+        query = text.replace("/user", "").strip()
 
         if query.isdigit():
             cur.execute("""
