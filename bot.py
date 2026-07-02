@@ -756,7 +756,18 @@ async def handle(update: Update, context):
         """, (tid,))
     
         db.commit()
-    
+        for admin in ADMIN_IDS:
+        try:
+            await context.bot.send_message(
+                admin,
+                f"📨 ادامه گفتگو - تیکت #{tid}\n\n"
+                f"👤 @{update.effective_user.username or 'ندارد'}\n"
+                f"🆔 {uid}\n\n"
+                f"📝 {text or caption}",
+                reply_markup=keyboard
+            )
+        except Exception as e:
+            print("ADMIN SEND ERROR:", e)
         # ارسال به ادمین 👇 (این بخش مهمه و تو کدت کم بوده)
         for admin in ADMIN_IDS:
             try:
