@@ -479,6 +479,26 @@ async def handle(update: Update, context):
 
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
+        if text == "🔙 بازگشت":
+        
+            # پاک کردن state ها
+            broadcast_mode.pop(uid, None)
+            receipt_lookup_mode.pop(uid, None)
+            ticket_mode.pop(uid, None)
+            continue_chat.pop(uid, None)
+            unban_mode.pop(uid, None)
+        
+            # تشخیص نقش کاربر
+            if uid in ADMIN_IDS:
+                menu = admin_menu()
+            else:
+                menu = user_menu()
+        
+            await update.message.reply_text(
+                "🔄 به منوی اصلی برگشتید",
+                reply_markup=menu
+            )
+            return
     
         if receipt_lookup_mode.get(uid):
     
@@ -585,26 +605,6 @@ async def handle(update: Update, context):
                         InlineKeyboardButton("❌ نه", callback_data="confirm_clear_no"),
                     ]
                 ])
-            )
-            return
-        if text == "🔙 بازگشت":
-        
-            # پاک کردن state ها
-            broadcast_mode.pop(uid, None)
-            receipt_lookup_mode.pop(uid, None)
-            ticket_mode.pop(uid, None)
-            continue_chat.pop(uid, None)
-            unban_mode.pop(uid, None)
-        
-            # تشخیص نقش کاربر
-            if uid in ADMIN_IDS:
-                menu = admin_menu()
-            else:
-                menu = user_menu()
-        
-            await update.message.reply_text(
-                "🔄 به منوی اصلی برگشتید",
-                reply_markup=menu
             )
             return
         if text == "📊 گزارش پنل":
