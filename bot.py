@@ -76,6 +76,11 @@ status TEXT DEFAULT 'pending'
 db.commit()
 
 try:
+    cur.execute("ALTER TABLE receipts ADD COLUMN tx_code TEXT;")
+    db.commit()
+except:
+    pass
+try:
     cur.execute("ALTER TABLE receipts ADD COLUMN file_id TEXT;")
     db.commit()
 except:
@@ -249,53 +254,50 @@ async def callback(update: Update, context):
         return
     if q.data.startswith("accept_receipt_"):
     
-        receipt_id = int(q.data.split("_")[2])
-    
-        cur.execute("""
-            SELECT user_id, file_id
-            FROM receipts
-            WHERE id=?
-        """, (receipt_id,))
-    
-        row = cur.fetchone()
-    
-        if not row:
-            await q.answer("❌ رسید پیدا نشد")
-            return
-    
-        user_id, file_id = row
-    
-        # ✔ ساخت کد تایید
-        import random
-        tx_code = f"TX-{random.randint(100000, 999999)}"
-    
-        # ✔ آپدیت دیتابیس
-        cur.execute("""
-            UPDATE receipts
-            SET status='accepted', tx_code=?
-            WHERE id=?
-        """, (tx_code, receipt_id))
-        db.commit()
-    
-        await q.answer("✅ تایید شد")
-    
         try:
+            receipt_id = int(q.data.split("_")[2])
+    
+            cur.execute("""
+                SELECT user_id, file_id
+                FROM receipts
+                WHERE id=?
+            """, (receipt_id,))
+    
+            row = cur.fetchone()
+    
+            if not row:
+                await q.answer("❌ رسید پیدا نشد")
+                return
+    
+            user_id, file_id = row
+    
+            import random
+            tx_code = f"TX-{random.randint(100000,999999)}"
+    
+            cur.execute("""
+                UPDATE receipts
+                SET status='accepted', tx_code=?
+                WHERE id=?
+            """, (tx_code, receipt_id))
+            db.commit()
+    
+            await q.answer("✅ تایید شد")
+    
             await context.bot.send_photo(
                 chat_id=user_id,
                 photo=file_id,
-                caption=(
-                    "✅ رسید شما تایید شد\n\n"
-                    f"🧾 کد تایید: {tx_code}\n\n"
-                )
+                caption=f"✅ رسید تایید شد\n\n🧾 کد: {tx_code}"
             )
-        except:
-            pass
     
-        await q.edit_message_reply_markup(
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("✅ تایید شد", callback_data="done")]
-            ])
-        )
+            await q.edit_message_reply_markup(
+                InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ تایید شد", callback_data="done")]
+                ])
+            )
+    
+        except Exception as e:
+            await q.answer("❌ خطا رخ داد")
+            print("ERROR:", e)
     
         return
     if q.data.startswith("reject_receipt_"):
