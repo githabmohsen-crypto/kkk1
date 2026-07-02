@@ -666,11 +666,11 @@ async def handle(update: Update, context):
             reply_markup=receipt_menu()
         )
     
-        receipt_mode[uid] = True
+        receipt_mode[uid] = True  # اگر حالت داری
+    
         return
     
-    
-    # 2. بررسی ارسال عکس
+        return
     if receipt_mode.get(uid):
     
         if not photo:
@@ -679,7 +679,7 @@ async def handle(update: Update, context):
                 "❌ لطفاً فقط تصویر رسید را ارسال کنید."
             )
     
-            return
+            return 
     if text == "📖 راهنما":
 
         await update.message.reply_text(
