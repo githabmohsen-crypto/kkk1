@@ -474,6 +474,29 @@ async def handle(update: Update, context):
 
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
+        if receipt_lookup_mode.get(uid):
+            username = text.strip().replace("@", "")
+    
+            cur.execute("""
+                SELECT tx_code
+                FROM receipts
+                WHERE username=?
+                AND status='accepted'
+                ORDER BY id DESC
+            """, (username,))
+    
+            rows = cur.fetchall()
+            receipt_lookup_mode.pop(uid, None)
+    
+            if not rows:
+                await update.message.reply_text("❌ هیچ کد تایید شده‌ای پیدا نشد")
+                return
+    
+            msg = "🧾 کدهای تایید شده:\n\n"
+            msg += "\n".join([f"✅ {r[0]}" for r in rows])
+    
+            await update.message.reply_text(msg)
+            return
 
         if text == "📣 ارسال همگانی":
             broadcast_mode[uid] = True
@@ -517,34 +540,7 @@ async def handle(update: Update, context):
                 ])
             )
             return
-        if uid in ADMIN_IDS and receipt_lookup_mode.get(uid):
 
-            username = text.strip().replace("@", "")
-        
-            cur.execute("""
-                SELECT tx_code, created, status
-                FROM receipts
-                WHERE username=?
-                AND status='accepted'
-                ORDER BY id DESC
-            """, (username,))
-        
-            rows = cur.fetchall()
-        
-            receipt_lookup_mode.pop(uid, None)
-        
-            if not rows:
-                await update.message.reply_text("❌ هیچ کد تایید شده‌ای پیدا نشد")
-                return
-        
-            msg = f"🧾 کدهای تایید شده @{username}:\n\n"
-        
-            for tx_code, created, status in rows:
-                msg += f"✅ {tx_code}\n"
-        
-            await update.message.reply_text(msg)
-        
-            return
         if text == "📊 گزارش پنل":
 
             cur.execute("SELECT COUNT(*) FROM users")
