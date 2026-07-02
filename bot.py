@@ -707,14 +707,6 @@ async def handle(update: Update, context):
         
         support_message[uid] = msg.message_id
     cur.execute("""
-        SELECT id
-        FROM tickets
-        WHERE user_id=? AND status='open'
-        ORDER BY id DESC
-        LIMIT 1
-    """, (uid,))
-
-    cur.execute("""
     SELECT id, waiting_admin
     FROM tickets
     WHERE user_id=? AND status='open'
@@ -756,6 +748,10 @@ async def handle(update: Update, context):
         """, (tid,))
     
         db.commit()
+    
+        # ارسال به ادمین (اصلاح‌شده و امن)
+        message_text = text if text else caption
+    
         for admin in ADMIN_IDS:
             try:
                 await context.bot.send_message(
@@ -763,11 +759,12 @@ async def handle(update: Update, context):
                     f"📨 ادامه گفتگو - تیکت #{tid}\n\n"
                     f"👤 @{update.effective_user.username or 'ندارد'}\n"
                     f"🆔 {uid}\n\n"
-                    f"📝 {text or caption}",
+                    f"📝 {message_text}",
                     reply_markup=keyboard
                 )
             except Exception as e:
                 print("ADMIN SEND ERROR:", e)
+    
         await update.message.reply_text("پیام شما به تیکت قبلی اضافه شد ✅")
     
         continue_chat.pop(uid, None)
