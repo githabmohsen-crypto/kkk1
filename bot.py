@@ -475,6 +475,20 @@ async def handle(update: Update, context):
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
         if receipt_lookup_mode.get(uid):
+            admin_buttons = [
+                "📊 گزارش پنل",
+                "📋 تیکت‌های باز",
+                "🗑 پاکسازی گزارش پنل",
+                "📣 ارسال همگانی",
+                "✅ رفع افراد مسدود شده"
+            ]
+
+        # اگر دکمه زد → خارج شو
+        if text in admin_buttons:
+            return
+
+        if not text:
+            return
             query = text.strip()
         
             # اگر عدد بود => user_id
@@ -715,7 +729,7 @@ async def handle(update: Update, context):
     # ---------------- USER ----------------
     if text == "🧾 جستجوی کد کاربر":
         receipt_lookup_mode[uid] = True
-        await update.message.reply_text("👤 یوزرنیم کاربر را وارد کنید (بدون @)")
+        await update.message.reply_text("👤 یوزر آیدی یا یوزرنیم کاربر را وارد کنید (بدون @)")
         return
         
     if text == "👤 پروفایل من":
