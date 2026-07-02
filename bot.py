@@ -302,21 +302,50 @@ async def callback(update: Update, context):
     
         return
     if q.data.startswith("reject_receipt_"):
-
+    
         receipt_id = int(q.data.split("_")[2])
     
-        cur.execute(
-            "UPDATE receipts SET status='rejected' WHERE id=?",
-            (receipt_id,)
-        )
+        cur.execute("""
+            SELECT user_id, file_id
+            FROM receipts
+            WHERE id=?
+        """, (receipt_id,))
     
+        row = cur.fetchone()
+    
+        if not row:
+            await q.answer("❌ رسید پیدا نشد")
+            return
+    
+        user_id, file_id = row
+    
+        # آپدیت وضعیت در دیتابیس
+        cur.execute("""
+            UPDATE receipts
+            SET status='rejected'
+            WHERE id=?
+        """, (receipt_id,))
         db.commit()
     
-        await q.answer("❌ رسید رد شد")
+        await q.answer("❌ رد شد")
     
+        # ارسال همون رسید + پیام به کاربر
+        try:
+            await context.bot.send_photo(
+                chat_id=user_id,
+                photo=file_id,
+                caption=(
+                    "❌ رسید شما تایید نشد\n\n"
+                    "📌 لطفاً بررسی کنید و دوباره ارسال کنید."
+                )
+            )
+        except:
+            pass
+    
+        # تغییر ظاهر دکمه در پنل ادمین
         await q.edit_message_reply_markup(
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("❌ رسید رد شد", callback_data="done")]
+                [InlineKeyboardButton("❌ رد شد", callback_data="done")]
             ])
         )
     
