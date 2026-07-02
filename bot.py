@@ -161,7 +161,7 @@ def receipt_menu():
         ],
         resize_keyboard=True
     )
-def support_menu():
+def support_chat_menu():
     return ReplyKeyboardMarkup(
         [
             ["🔙 بازگشت"]
@@ -215,11 +215,26 @@ async def callback(update: Update, context):
         if ticket:
             await q.message.reply_text(
                 "📩 شما در حال حاضر یک تیکت فعال دارید.\n\n"
-                "در صورتی که پیام قبلی شما توسط پشتیبانی پاسخ داده شده باشد، می‌توانید اکنون پیام جدید خود را ارسال کنید.")
+                "در صورتی که پیام قبلی شما توسط پشتیبانی پاسخ داده شده باشد، می‌توانید اکنون پیام جدید خود را ارسال کنید."
+            )
             return
     
+        # 👇 ساخت تیکت
+        cur.execute("""
+            INSERT INTO tickets (user_id, message, status, waiting_admin)
+            VALUES (?, ?, 'open', 1)
+        """, (uid, ""))
+    
+        db.commit()
+    
         ticket_mode[uid] = True
-        await q.message.reply_text("✍ پیام خود را ارسال کنید")
+        continue_chat[uid] = True   # 👈 اینو اضافه کن مهمه
+    
+        await q.message.reply_text(
+            "✍ پیام خود را ارسال کنید",
+            reply_markup=support_chat_menu()
+        )
+    
         return
     if q.data == "continue_chat":
         continue_chat[uid] = True
@@ -607,6 +622,7 @@ async def handle(update: Update, context):
         return
     if text == "🔙 بازگشت":
     
+        continue_chat.pop(uid, None)
         receipt_mode.pop(uid, None)
     
         await update.message.reply_text(
@@ -722,14 +738,17 @@ async def handle(update: Update, context):
             except:
                 pass
     
-        await update.message.reply_text(
-            "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه پایین استفاده کنید.\n\n"
+        msg = await update.message.reply_text(
+            "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه زیر استفاده کنید.\n\n"
             "‼️ لطفاً موضوع را واضح و کامل بنویسید 💙\n\n"
             "پس از ثبت تیکت، تا پاسخ ادمین صبور باشید ⏳\n\n"
             "🚫 ارسال پیام پشت سر هم قبل از پاسخ ممنوع است.",
-            reply_markup=support_menu()   # 👈 فقط دکمه پایین
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
+            ])
         )
     
+        support_message[uid] = msg.message_id
         return
         support_message[uid] = msg.message_id
     cur.execute("""
