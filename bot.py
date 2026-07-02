@@ -751,7 +751,7 @@ async def handle(update: Update, context):
     
         # ارسال به ادمین (اصلاح‌شده و امن)
         message_text = text if text else caption
-    
+            
         for admin in ADMIN_IDS:
             try:
                 await context.bot.send_message(
