@@ -262,8 +262,8 @@ async def callback(update: Update, context):
     
         return
     if q.data.startswith("reject_receipt_"):
-    
-        receipt_id = int(q.data.split("_")[-1])
+
+        receipt_id = int(q.data.split("_")[2])
     
         cur.execute(
             "UPDATE receipts SET status='rejected' WHERE id=?",
@@ -619,114 +619,129 @@ async def handle(update: Update, context):
             )
         return
     if text == "🔙 بازگشت":
+    
+        # ❌ لغو همه حالت‌ها
         ticket_mode.pop(uid, None)
         continue_chat.pop(uid, None)
-        receipt_mode.pop(uid, None)
-
+        receipt_mode.pop(uid, None)   # 👈 این مهمه
+    
+        # (اختیاری) حذف تیکت خالی
+        cur.execute("""
+            SELECT id FROM tickets
+            WHERE user_id=? AND status='open' AND message=''
+            ORDER BY id DESC
+            LIMIT 1
+        """, (uid,))
+        empty_ticket = cur.fetchone()
+    
+        if empty_ticket:
+            cur.execute("DELETE FROM tickets WHERE id=?", (empty_ticket[0],))
+            db.commit()
+    
         await update.message.reply_text(
             "🏠 به منوی اصلی برگشتید",
             reply_markup=user_menu()
         )
+    
         return
-
-    # =========================
-    # 📜 قوانین
-    # =========================
     if text == "📜 قوانین":
         await update.message.reply_text(
             "📜 قوانین سیستم پشتیبانی Kaletek\n\n"
             "1️⃣ احترام الزامی است\n"
             "2️⃣ هر تیکت یک موضوع مشخص\n"
             "3️⃣ ارسال اسپم ممنوع\n"
-            "4️⃣ فقط یک تیکت فعال\n"
-            "5️⃣ ارسال مستقیم به ادمین ممنوع\n\n"
+            "4️⃣ توضیحات کامل بنویسید\n"
+            "5️⃣ ارتباط مستقیم با ادمین ممنوع\n"
+            "6️⃣ زمان پاسخ‌گویی ممکن است متفاوت باشد\n"
+            "7️⃣ اطلاعات حساس ارسال نکنید\n\n"
+            "━━━━━━━━━━━━\n"
             "💙 با استفاده از ربات قوانین را پذیرفته‌اید"
         )
         return
-
-    # =========================
-    # 📖 راهنما
-    # =========================
-    if text == "📖 راهنما":
-        await update.message.reply_text(
-            "📖 راهنمای ربات Kaletek\n\n"
-            "برای هر سوال از دکمه تماس با پشتیبانی استفاده کنید.\n"
-            "ارسال پیام مستقیم به ادمین ممنوع است.\n\n"
-            "• فقط 1 تیکت فعال\n"
-            "• هر تیکت فقط 1 پیام\n"
-            "• تا پاسخ ادمین صبر کنید\n\n"
-            "💙 با رعایت قوانین پاسخ سریع‌تر می‌شود",
-            reply_markup=user_menu()
-        )
-        return
-
-    # =========================
-    # 🧾 ارسال رسید
-    # =========================
     if text == "📨 ارسال رسید":
-        receipt_mode[uid] = True
-
+    
         await update.message.reply_text(
-            "📎 لطفاً تصویر رسید خود را ارسال کنید",
+            "📎 لطفاً رسید خود را ارسال کنید",
             reply_markup=receipt_menu()
         )
+    
+        receipt_mode[uid] = True
         return
-
-    # =========================
-    # 🧾 پردازش رسید (اصلی)
-    # =========================
+    
+    
+    # 📖 راهنما
+    if text == "📖 راهنما":
+    
+        await update.message.reply_text(
+            "📖 راهنمای ربات Kaletek\n\n"
+            "در صورت داشتن هرگونه سوال یا مشکل، لطفاً از طریق دکمه «📞 تماس با پشتیبانی» اقدام کنید و از ارسال پیام به آیدی ادمین خودداری نمایید.\n"
+            "در صورت مشاهده پیام مستقیم به ادمین، امکان اعمال محدودیت برای حساب شما وجود خواهد داشت.\n\n"
+            "📌 قوانین استفاده از سیستم پشتیبانی:\n"
+            "• شما فقط مجاز به ایجاد یک تیکت فعال هستید\n"
+            "• پس از بسته شدن هر تیکت، امکان ایجاد تیکت جدید وجود دارد\n"
+            "• در هر تیکت تنها مجاز به ارسال یک پیام هستید\n"
+            "• برای ارسال پیام بعدی باید منتظر پاسخ ادمین باشید\n\n"
+            "🙏 با رعایت این موارد، روند پاسخگویی سریع‌تر و دقیق‌تر انجام خواهد شد.",
+            reply_markup=user_menu()
+        )
+    
+        return
+    
+    
+    # 🧾 بررسی ارسال رسید (فقط وقتی حالت فعاله)
     if receipt_mode.get(uid):
-
+    
         if not photo:
-            await update.message.reply_text("❌ لطفاً فقط تصویر ارسال کنید")
+            await update.message.reply_text("❌ لطفاً فقط تصویر رسید را ارسال کنید.")
             return
-
+    
         file_id = photo[-1].file_id
-
+    
         cur.execute("""
             SELECT id FROM tickets
             WHERE user_id=? AND status='open'
             ORDER BY id DESC
             LIMIT 1
         """, (uid,))
-
+    
         row = cur.fetchone()
-        tid = row[0] if row else None
-
+        tid = row[0] if row else 0
+    
+        username = update.effective_user.username or "ندارد"
+    
         cur.execute("""
-            INSERT INTO receipts(user_id, username, file_id)
-            VALUES(?, ?, ?)
-        """, (uid, username, file_id))
-
+            INSERT INTO receipts(user_id, username)
+            VALUES(?, ?)
+        """, (uid, username))
+    
         db.commit()
         receipt_id = cur.lastrowid
-
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("✅ تایید رسید", callback_data=f"accept_receipt_{receipt_id}")],
-            [InlineKeyboardButton("❌ رد رسید", callback_data=f"reject_receipt_{receipt_id}")],
-            [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-            [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-            [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
-        ])
-
+    
         for admin in ADMIN_IDS:
             await context.bot.send_photo(
                 admin,
                 photo=file_id,
-                caption=f"🧾 رسید جدید\n👤 @{username}\n🆔 {uid}",
-                reply_markup=keyboard
+                caption=(
+                    f"🧾 رسید جدید\n\n"
+                    f"👤 @{username}\n"
+                    f"🆔 {uid}"
+                ),
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ تایید رسید", callback_data=f"accept_receipt_{receipt_id}")],
+                    [InlineKeyboardButton("❌ عدم تایید", callback_data=f"reject_receipt_{receipt_id}")],
+                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
+                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
+                    [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
+                ])
             )
-
-        await update.message.reply_text("✅ رسید شما ارسال شد")
-
+    
+        await update.message.reply_text("✅ رسید شما با موفقیت ارسال شد.")
+    
         receipt_mode.pop(uid, None)
         return
 
-    # =========================
-    # 📞 تماس با پشتیبانی
-    # =========================
     if text == "📞 تماس با پشتیبانی":
-
+    
         if uid in support_message:
             try:
                 await context.bot.delete_message(
@@ -735,74 +750,87 @@ async def handle(update: Update, context):
                 )
             except:
                 pass
-
+    
         msg = await update.message.reply_text(
-            "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، پیام خود را ارسال کنید\n\n"
-            "‼️ لطفاً واضح بنویسید\n\n"
-            "⏳ بعد از ثبت تیکت صبر کنید",
+            "✔️ برای دریافت پاسخ از کارشناسان پشتیبانی، از دکمه زیر استفاده کنید.\n\n"
+            "‼️ لطفاً موضوع را واضح و کامل بنویسید 💙\n\n"
+            "پس از ثبت تیکت، تا پاسخ ادمین صبور باشید ⏳\n\n"
+            "🚫 ارسال پیام پشت سر هم قبل از پاسخ ممنوع است.",
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("✍ شروع گفتگو", callback_data="start_ticket")]
+                [InlineKeyboardButton("✍ شروع گفتگو با پشتیبانی", callback_data="start_ticket")]
             ])
         )
-
+    
         support_message[uid] = msg.message_id
         return
-
-    # =========================
-    # 🧠 تیکت سیستم
-    # =========================
+        support_message[uid] = msg.message_id
     cur.execute("""
-        SELECT id, waiting_admin
-        FROM tickets
-        WHERE user_id=? AND status='open'
-        ORDER BY id DESC
-        LIMIT 1
+    SELECT id, waiting_admin
+    FROM tickets
+    WHERE user_id=? AND status='open'
+    ORDER BY id DESC
+    LIMIT 1
     """, (uid,))
-
+    
     ticket = cur.fetchone()
-
+    
+    skip_check = text == "📞 تماس با پشتیبانی"
+    
     if ticket:
-
+    
         tid, waiting = ticket
         can_continue = continue_chat.get(uid, False)
-
-        if waiting == 1 and not can_continue:
+    
+        if waiting == 1 and not can_continue and not skip_check:
             await update.message.reply_text(
-                "⏳ کارشناسان در حال بررسی پیام قبلی شما هستند\n"
-                "لطفاً صبور باشید"
+                "⏳ کارشناسان در حال بررسی پیام قبلی شما هستند\n\n"
+                "لطفاً تا زمان پاسخگویی کارشناسان صبور باشید.\n"
+                "پس از دریافت پاسخ، می‌توانید پیام جدید خود را ارسال کنید. 🙏"
             )
             return
-
-        message_text = text or "پیام جدید"
-
+        message_text = text or caption or "📎 پیام جدید"
+    
         cur.execute("""
             UPDATE tickets
             SET message = message || '\n\n' || ?
             WHERE id=?
         """, (message_text, tid))
-
+    
         cur.execute("""
             UPDATE tickets
             SET waiting_admin=1
             WHERE id=?
         """, (tid,))
-
+    
         db.commit()
-
+    
         for admin in ADMIN_IDS:
-            await context.bot.send_message(
-                admin,
-                f"📨 تیکت #{tid}\n👤 @{username}\n🆔 {uid}\n\n📝 {message_text}",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
-                    [InlineKeyboardButton("🚫 بن", callback_data=f"ban_{uid}")]
-                ])
-            )
-
+            try:
+                await context.bot.send_message(
+                    admin,
+                    f"📨 ادامه گفتگو - تیکت #{tid}\n\n"
+                    f"👤 @{update.effective_user.username or 'ندارد'}\n"
+                    f"🆔 {uid}\n\n"
+                    f"📝 {message_text}",
+                    reply_markup=InlineKeyboardMarkup([
+                        [
+                            InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")
+                        ],
+                        [
+                            InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")
+                        ],
+                        [
+                            InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")
+                        ]
+                    ])
+                )
+            except Exception as e:
+                print("ADMIN SEND ERROR:", e)
+    
         await update.message.reply_text("پیام شما ارسال شد ✅")
-
+    
         continue_chat.pop(uid, None)
+    
         return
         tid, waiting = ticket
 
