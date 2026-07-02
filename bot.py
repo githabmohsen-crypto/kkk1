@@ -620,11 +620,12 @@ async def handle(update: Update, context):
         return
     if text == "🔙 بازگشت":
     
-        # ❌ لغو حالت ساخت تیکت اگر هنوز پیام نداده
+        # ❌ لغو همه حالت‌ها
         ticket_mode.pop(uid, None)
         continue_chat.pop(uid, None)
+        receipt_mode.pop(uid, None)   # 👈 این مهمه
     
-        # (اختیاری ولی حرفه‌ای) اگر تیکت خالی ساخته شده حذف شود
+        # (اختیاری) حذف تیکت خالی
         cur.execute("""
             SELECT id FROM tickets
             WHERE user_id=? AND status='open' AND message=''
@@ -657,6 +658,7 @@ async def handle(update: Update, context):
             "💙 با استفاده از ربات قوانین را پذیرفته‌اید"
         )
         return
+# 1. ورود به حالت ارسال رسید
     if text == "📨 ارسال رسید":
     
         await update.message.reply_text(
@@ -664,11 +666,11 @@ async def handle(update: Update, context):
             reply_markup=receipt_menu()
         )
     
-        receipt_mode[uid] = True  # اگر حالت داری
-    
+        receipt_mode[uid] = True
         return
     
-        return
+    
+    # 2. بررسی ارسال عکس
     if receipt_mode.get(uid):
     
         if not photo:
