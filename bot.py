@@ -475,29 +475,46 @@ async def handle(update: Update, context):
     # ---------------- ADMIN ----------------
     if uid in ADMIN_IDS:
         if receipt_lookup_mode.get(uid):
-            username = text.strip().replace("@", "")
-    
-            cur.execute("""
-                SELECT tx_code
-                FROM receipts
-                WHERE username=?
-                AND status='accepted'
-                ORDER BY id DESC
-            """, (username,))
-    
+            query = text.strip()
+        
+            # اگر عدد بود => user_id
+            if query.isdigit():
+                cur.execute("""
+                    SELECT tx_code
+                    FROM receipts
+                    WHERE user_id=?
+                    AND status='accepted'
+                    ORDER BY id DESC
+                """, (int(query),))
+        
+                label = f"🆔 {query}"
+        
+            else:
+                # اگر یوزرنیم بود
+                username = query.replace("@", "")
+        
+                cur.execute("""
+                    SELECT tx_code
+                    FROM receipts
+                    WHERE username=?
+                    AND status='accepted'
+                    ORDER BY id DESC
+                """, (username,))
+        
+                label = f"@{username}"
+        
             rows = cur.fetchall()
             receipt_lookup_mode.pop(uid, None)
-    
+        
             if not rows:
                 await update.message.reply_text("❌ هیچ کد تایید شده‌ای پیدا نشد")
                 return
-    
-            msg = "🧾 کدهای تایید شده:\n\n"
+        
+            msg = f"🧾 کدهای تایید شده برای {label}:\n\n"
             msg += "\n".join([f"✅ {r[0]}" for r in rows])
-    
+        
             await update.message.reply_text(msg)
             return
-
         if text == "📣 ارسال همگانی":
             broadcast_mode[uid] = True
             await update.message.reply_text("✍ پیام همگانی را ارسال کنید")
