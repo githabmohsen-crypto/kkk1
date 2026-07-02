@@ -465,6 +465,59 @@ async def callback(update: Update, context):
 
 # ---------------- HANDLE ----------------
 async def handle(update: Update, context):
+    
+    if uid in ADMIN_IDS and text:
+    
+        query = text.strip()
+    
+        # اگر /user حذف شد
+        if query.startswith("/user "):
+            query = query.replace("/user ", "").strip()
+    
+        # تشخیص اینکه عدد هست یا یوزرنیم
+        if query.isdigit():
+            cur.execute("""
+                SELECT user_id, username, status, tx_code
+                FROM receipts
+                WHERE user_id=?
+                ORDER BY id DESC
+            """, (int(query),))
+        else:
+            username = query.replace("@", "")
+            cur.execute("""
+                SELECT user_id, username, status, tx_code
+                FROM receipts
+                WHERE username=?
+                ORDER BY id DESC
+            """, (username,))
+    
+        rows = cur.fetchall()
+    
+        if not rows:
+            await update.message.reply_text("❌ هیچ رسیدی برای این کاربر پیدا نشد")
+            return
+    
+        user_id = rows[0][0]
+        username = rows[0][1]
+    
+        text_out = f"🧾 گزارش کاربر\n\n👤 @{username}\n🆔 {user_id}\n\n"
+    
+        for i, (uid2, uname, status, tx) in enumerate(rows, 1):
+    
+            status_text = {
+                "pending": "⏳ در انتظار",
+                "accepted": "✅ تایید شده",
+                "rejected": "❌ رد شده"
+            }.get(status, status)
+    
+            text_out += (
+                f"{i}. 🔑 {tx}\n"
+                f"   📌 {status_text}\n\n"
+            )
+    
+        await update.message.reply_text(text_out)
+    
+        return
 
     if not await enforce_channel(update, context):
         return
