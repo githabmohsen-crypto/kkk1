@@ -167,6 +167,7 @@ def admin_menu():
 def receipt_menu():
     return ReplyKeyboardMarkup(
         [
+            ["📎 ارسال رسید دیگر"],
             ["🔙 بازگشت"]
         ],
         resize_keyboard=True
@@ -831,14 +832,22 @@ async def handle(update: Update, context):
         return
     if text == "📨 ارسال رسید":
     
+        receipt_mode[uid] = True
+    
         await update.message.reply_text(
             "📎 لطفاً رسید خود را ارسال کنید",
             reply_markup=receipt_menu()
         )
-    
-        receipt_mode[uid] = True
         return
+    if text == "📎 ارسال رسید دیگر":
+
+        receipt_mode[uid] = True
     
+        await update.message.reply_text(
+            "📎 لطفاً رسید جدید را ارسال کنید",
+            reply_markup=receipt_menu()
+        )
+        return
     
     # 📖 راهنما
     if text == "📖 راهنما":
@@ -910,7 +919,11 @@ async def handle(update: Update, context):
     
         await update.message.reply_text("✅ رسید شما با موفقیت ارسال شد.")
     
-        receipt_mode.pop(uid, None)
+        await update.message.reply_text(
+            "📎 اگر رسید دیگری دارید، روی «ارسال رسید دیگر» بزنید",
+            reply_markup=receipt_menu()
+        )
+        
         return
     if text == "📞 تماس با پشتیبانی":
     
