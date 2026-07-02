@@ -622,9 +622,22 @@ async def handle(update: Update, context):
         return
     if text == "🔙 بازگشت":
     
-        # پاک کردن تمام حالت‌های تیکت
+        # ❌ لغو حالت ساخت تیکت اگر هنوز پیام نداده
         ticket_mode.pop(uid, None)
         continue_chat.pop(uid, None)
+    
+        # (اختیاری ولی حرفه‌ای) اگر تیکت خالی ساخته شده حذف شود
+        cur.execute("""
+            SELECT id FROM tickets
+            WHERE user_id=? AND status='open' AND message=''
+            ORDER BY id DESC
+            LIMIT 1
+        """, (uid,))
+        empty_ticket = cur.fetchone()
+    
+        if empty_ticket:
+            cur.execute("DELETE FROM tickets WHERE id=?", (empty_ticket[0],))
+            db.commit()
     
         await update.message.reply_text(
             "🏠 به منوی اصلی برگشتید",
