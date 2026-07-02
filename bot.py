@@ -716,30 +716,22 @@ async def handle(update: Update, context):
     
     ticket = cur.fetchone()
     
-    if ticket and text not in [
-        "👤 پروفایل من",
-        "📞 تماس با پشتیبانی",
-        "📜 قوانین"
-    ]:
+    if ticket:
     
         tid, waiting = ticket
-    
         can_continue = continue_chat.get(uid, False)
     
-        # اگر اجازه ادامه ندارد
         if waiting == 1 and not can_continue:
-            await update.message.reply_text(
-                "⏳ پیام قبلی شما در حال بررسی توسط پشتیبانی است.\n\n"
-                "لطفاً تا زمان پاسخگویی منتظر بمانید."
-            )
+            await update.message.reply_text("⏳ در حال بررسی هست")
             return
     
-        # ثبت در دیتابیس
+        message_text = text or caption or "📎 پیام جدید"
+    
         cur.execute("""
             UPDATE tickets
             SET message = message || '\n\n' || ?
             WHERE id=?
-        """, (text or caption, tid))
+        """, (message_text, tid))
     
         cur.execute("""
             UPDATE tickets
@@ -749,9 +741,6 @@ async def handle(update: Update, context):
     
         db.commit()
     
-        # ارسال به ادمین (اصلاح‌شده و امن)
-        message_text = text if text else caption
-            
         for admin in ADMIN_IDS:
             try:
                 await context.bot.send_message(
@@ -759,27 +748,16 @@ async def handle(update: Update, context):
                     f"📨 ادامه گفتگو - تیکت #{tid}\n\n"
                     f"👤 @{update.effective_user.username or 'ندارد'}\n"
                     f"🆔 {uid}\n\n"
-                    f"📝 {message_text}",
-                    reply_markup=keyboard
+                    f"📝 {message_text}"
                 )
             except Exception as e:
                 print("ADMIN SEND ERROR:", e)
     
-        await update.message.reply_text("پیام شما به تیکت قبلی اضافه شد ✅")
+        await update.message.reply_text("پیام شما ارسال شد ✅")
     
         continue_chat.pop(uid, None)
     
         return
-    if ticket and text not in ["👤 پروفایل من", "📞 تماس با پشتیبانی", "📜 قوانین"]:
-        if not continue_chat.get(uid, False):
-        
-            await update.message.reply_text(
-                "برای ارسال پیام جدید ابتدا روی دکمه «🔄 ادامه گفتگو با ادمین» بزنید."
-            )
-        
-            return
-            
-
         tid, waiting = ticket
 
         # اگر هنوز ادمین پاسخ نداده
