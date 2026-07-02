@@ -680,6 +680,14 @@ async def handle(update: Update, context):
                     ])
                 )
             return
+        if text == "🧾 جستجوی کد کاربر":
+            receipt_lookup_mode[uid] = True
+        
+            await update.message.reply_text(
+                "👤 یوزرنیم یا آیدی کاربر را وارد کنید",
+                reply_markup=back_menu()
+            )
+            return
 
 
         # ---------------- FIX 2: MEDIA NOT NONE ----------------
@@ -756,14 +764,6 @@ async def handle(update: Update, context):
             return
 
     # ---------------- USER ----------------
-    if text == "🧾 جستجوی کد کاربر":
-        receipt_lookup_mode[uid] = True
-    
-        await update.message.reply_text(
-            "👤 یوزرنیم یا آیدی کاربر را وارد کنید",
-            reply_markup=back_menu()
-        )
-        return
     if text == "👤 پروفایل من":
 
         cur.execute("SELECT username, join_time, tickets_count FROM profiles WHERE user_id=?", (uid,))
