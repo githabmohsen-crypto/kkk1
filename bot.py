@@ -205,13 +205,11 @@ async def callback(update: Update, context):
         await q.message.reply_text("✍ پیام خود را ارسال کنید")
         return
     if q.data == "continue_chat":
-    
         continue_chat[uid] = True
     
         await q.message.reply_text(
             "✍ پیام خود را برای ادامه گفتگو ارسال کنید."
         )
-    
         return
     if q.data.startswith("accept_receipt_"):
 
@@ -730,20 +728,42 @@ async def handle(update: Update, context):
         "📞 تماس با پشتیبانی",
         "📜 قوانین"
     ]:
-
+    
         tid, waiting = ticket
     
-        if waiting == 1 and not continue_chat.get(uid):
+        can_continue = continue_chat.get(uid, False)
     
+        # اگر اجازه ادامه ندارد
+        if waiting == 1 and not can_continue:
             await update.message.reply_text(
                 "⏳ پیام قبلی شما در حال بررسی توسط پشتیبانی است.\n\n"
                 "لطفاً تا زمان پاسخگویی منتظر بمانید."
             )
-    
             return
-
+    
+        # ارسال پیام به تیکت قبلی
+        await update.message.reply_text("پیام شما به تیکت قبلی اضافه شد ✅")
+    
+        cur.execute("""
+            UPDATE tickets
+            SET message = message || '\n\n' || ?
+            WHERE id=?
+        """, (text or caption, tid))
+    
+        cur.execute("""
+            UPDATE tickets
+            SET waiting_admin=1
+            WHERE id=?
+        """, (tid,))
+    
+        db.commit()
+    
+        # ریست کردن حالت ادامه گفتگو
+        continue_chat.pop(uid, None)
+    
+        return
     if ticket and text not in ["👤 پروفایل من", "📞 تماس با پشتیبانی", "📜 قوانین"]:
-        if not continue_chat.get(uid):
+        if not continue_chat.get(uid, False):
         
             await update.message.reply_text(
                 "برای ارسال پیام جدید ابتدا روی دکمه «🔄 ادامه گفتگو با ادمین» بزنید."
