@@ -75,7 +75,7 @@ status TEXT DEFAULT 'pending'
 
 db.commit()
 
- try:
+try:
     cur.execute("ALTER TABLE receipts ADD COLUMN file_id TEXT;")
     db.commit()
 except:
