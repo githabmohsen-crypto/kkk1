@@ -857,6 +857,7 @@ async def handle(update: Update, context):
             "در صورت داشتن هرگونه سوال یا مشکل، لطفاً از طریق دکمه «📞 تماس با پشتیبانی» اقدام کنید و از ارسال پیام به آیدی ادمین خودداری نمایید.\n"
             "در صورت مشاهده پیام مستقیم به ادمین، امکان اعمال محدودیت برای حساب شما وجود خواهد داشت.\n\n"
             "📌 قوانین استفاده از سیستم پشتیبانی:\n"
+            "🚫 در صورت ارسال رسید رسید شما باید تاریخ و ساعت و مبلغ و چهار رقم آخر کارت به همراه کد پیگیری مشخص باشد و در صورت عدم نکات گفته شده رسید شما تایید نمی شود\n"
             "• شما فقط مجاز به ایجاد یک تیکت فعال هستید\n"
             "• پس از بسته شدن هر تیکت، امکان ایجاد تیکت جدید وجود دارد\n"
             "• در هر تیکت تنها مجاز به ارسال یک پیام هستید\n"
@@ -912,7 +913,6 @@ async def handle(update: Update, context):
                     [InlineKeyboardButton("✅ تایید رسید", callback_data=f"accept_receipt_{receipt_id}")],
                     [InlineKeyboardButton("❌ عدم تایید", callback_data=f"reject_receipt_{receipt_id}")],
                     [InlineKeyboardButton("✉ پاسخ", callback_data=f"reply_{uid}")],
-                    [InlineKeyboardButton("✔ بستن", callback_data=f"close_{tid}")],
                     [InlineKeyboardButton("🚫 بن کاربر", callback_data=f"ban_{uid}")]
                 ])
             )
