@@ -622,8 +622,9 @@ async def handle(update: Update, context):
         return
     if text == "🔙 بازگشت":
     
+        # پاک کردن تمام حالت‌های تیکت
+        ticket_mode.pop(uid, None)
         continue_chat.pop(uid, None)
-        receipt_mode.pop(uid, None)
     
         await update.message.reply_text(
             "🏠 به منوی اصلی برگشتید",
