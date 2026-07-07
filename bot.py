@@ -511,12 +511,7 @@ async def handle(update: Update, context):
 
     # ---------------- ADMIN ----------------
     if uid not in ADMIN_IDS:
-        if need_reset(uid):
-            clear_user_history(uid)
-            await update.message.reply_text(
-                "🧹 تاریخچه شما به صورت خودکار هر 24 ساعت پاک شد"
-            )
-            return   # 👈 خیلی مهم
+        pass
     if uid in ADMIN_IDS:
         if text == "🔙 بازگشت":
         
